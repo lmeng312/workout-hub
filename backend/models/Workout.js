@@ -63,6 +63,24 @@ const workoutSchema = new mongoose.Schema({
     originalText: {
       type: String,
       default: ''
+    },
+    preview: {
+      thumbnail: {
+        type: String,
+        default: ''
+      },
+      sourceTitle: {
+        type: String,
+        default: ''
+      },
+      sourceCreator: {
+        type: String,
+        default: ''
+      },
+      sourceDuration: {
+        type: Number, // in seconds
+        default: 0
+      }
     }
   },
   isPublic: {

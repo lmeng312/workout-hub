@@ -11,6 +11,8 @@ import LibraryScreen from './screens/LibraryScreen';
 import CreateWorkoutScreen from './screens/CreateWorkoutScreen';
 import WorkoutDetailScreen from './screens/WorkoutDetailScreen';
 import WorkoutPreviewScreen from './screens/WorkoutPreviewScreen';
+import EditWorkoutScreen from './screens/EditWorkoutScreen';
+import WorkoutSessionScreen from './screens/WorkoutSessionScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import FeedScreen from './screens/FeedScreen';
 import { AuthContext } from './context/AuthContext';
@@ -142,12 +144,33 @@ export default function App() {
               />
               <Stack.Screen 
                 name="WorkoutPreview" 
-                component={require('./screens/WorkoutPreviewScreen').default}
+                component={WorkoutPreviewScreen}
                 options={{
                   headerShown: true,
                   headerStyle: { backgroundColor: '#22c55e' },
                   headerTintColor: '#fff',
                   title: 'Review Workout'
+                }}
+              />
+              <Stack.Screen 
+                name="EditWorkout" 
+                component={EditWorkoutScreen}
+                options={{
+                  headerShown: true,
+                  headerStyle: { backgroundColor: '#22c55e' },
+                  headerTintColor: '#fff',
+                  title: 'Edit Workout'
+                }}
+              />
+              <Stack.Screen 
+                name="WorkoutSession" 
+                component={WorkoutSessionScreen}
+                options={{
+                  headerShown: true,
+                  headerStyle: { backgroundColor: '#22c55e' },
+                  headerTintColor: '#fff',
+                  title: 'Workout Session',
+                  headerLeft: null,
                 }}
               />
             </>

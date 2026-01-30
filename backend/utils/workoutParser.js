@@ -219,6 +219,14 @@ function extractEquipment(text) {
   if (textLower.includes('no equipment') || textLower.includes('bodyweight') || textLower.includes('no weights')) {
     return 'none';
   }
+  
+  // Check for specific weight mentions (e.g., "2 x 5kg dumbbells")
+  const weightMatch = text.match(/(\d+\s*x?\s*\d*\s*(?:kg|lb|lbs)?)\s*(dumbbell|kettlebell)/i);
+  if (weightMatch) {
+    const equipment = weightMatch[2].toLowerCase() + 's';
+    return equipment;
+  }
+  
   if (textLower.includes('dumbbell')) return 'dumbbells';
   if (textLower.includes('kettlebell')) return 'kettlebells';
   if (textLower.includes('resistance band')) return 'resistance bands';
@@ -266,8 +274,8 @@ function parseWorkoutFromText(text, sourceType = 'custom') {
   );
   workout.title = titleLine || 'Custom Workout';
 
-  // Extract duration from title
-  const duration = extractDuration(workout.title);
+  // Extract duration from entire text
+  const duration = extractDuration(text);
   if (duration) {
     workout.estimatedDuration = duration;
   }
@@ -277,30 +285,101 @@ function parseWorkoutFromText(text, sourceType = 'custom') {
   workout.equipment = extractEquipment(text);
   workout.difficulty = determineDifficulty(text);
 
-  // Parse exercises
+  // Parse exercises with section awareness
   let exerciseOrder = 0;
+  let currentSectionTiming = null; // Track section-level timing (e.g., "30 sec on, 10 sec off")
+  let currentSectionName = '';
   let currentExercise = null;
-  let inExerciseList = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const lineLower = line.toLowerCase();
 
-    // Skip common non-exercise lines
-    if (lineLower.match(/^(workout|routine|program|exercise|exercises|circuit|round|rounds|set|sets|rest|break|pause)/i) && 
-        line.length < 30 && !lineLower.includes(':')) {
+    // Detect section headers (e.g., "▸ Warm Up 30 sec on", "▸ Cardio 30 sec on, 10 sec off")
+    const sectionMatch = line.match(/^[▸►▪•\-\*]\s*([^:]+?)(?:\s+(\d+)\s*sec\s*on)?(?:,?\s*(\d+)\s*sec\s*off)?$/i);
+    if (sectionMatch) {
+      currentSectionName = sectionMatch[1].trim();
+      const workTime = sectionMatch[2] ? parseInt(sectionMatch[2]) : null;
+      const restTime = sectionMatch[3] ? parseInt(sectionMatch[3]) : null;
+      
+      currentSectionTiming = {
+        work: workTime,
+        rest: restTime || 0
+      };
       continue;
     }
 
-    // Detect exercise list start (numbered lists, bullet points, etc.)
-    if (line.match(/^[\d\.\)\-\•\*💪🔥⚡✅]/) || line.match(/^[A-Z][a-z]+(?:\s+[a-z]+)*\s*[-–:]/)) {
-      inExerciseList = true;
+    // Skip common non-exercise lines
+    if (lineLower.match(/^[▸►▪•\-\*]?\s*(workout|routine|program|time|equipment|muscles worked|duration|description):/i)) {
+      continue;
+    }
+
+    // Skip metadata lines
+    if (lineLower.match(/^[▸►▪•\-\*]?\s*(time|equipment|muscles worked|duration|difficulty|level):/i)) {
+      continue;
+    }
+
+    // Skip social media and promotional content
+    if (lineLower.match(/\b(subscribe|follow|like|share|comment|instagram|facebook|twitter|tiktok|youtube|@|http|www\.|\.com|\.net|\.org)\b/i)) {
+      continue;
+    }
+
+    // Skip URLs and email patterns
+    if (line.match(/https?:\/\/|www\.|@.*\.com|\.com\/|\.net\/|\.org\//i)) {
+      continue;
+    }
+
+    // Skip copyright, music, and credits
+    if (lineLower.match(/\b(copyright|music|song|artist|spotify|apple music|track|©|℗|credits?|produced by)\b/i)) {
+      continue;
+    }
+
+    // Skip descriptive headers (The Gear I Use:, My fitness watch:, etc.)
+    if (lineLower.match(/^(the|my|our|your|get|find|shop|buy|use|wear|watch)\s+[^:]+:/i)) {
+      continue;
+    }
+
+    // Skip lines with "gear", "watch", "use", "wear" in descriptive context
+    if (lineLower.match(/\b(gear|watch|wear|outfit|clothing|apparel|product|brand|link|shop|store)\s+(i|we|you|they)\s+(use|wear|love|recommend)/i)) {
+      continue;
+    }
+
+    // Skip ALL CAPS lines (usually headers or legal text like DISCLAIMER)
+    if (line.match(/^[A-Z\s]{4,}$/) && !line.match(/\d/)) {
+      continue;
+    }
+
+    // Skip lines starting with hashtags (promotional tags)
+    if (line.match(/^#[a-zA-Z]/)) {
+      continue;
+    }
+
+    // Skip lines that are clearly product/gear mentions
+    if (lineLower.match(/\b(disclaimer|disclosure|affiliate|sponsor|partner|brand|product|link in bio)\b/i)) {
+      continue;
+    }
+
+    // Skip very short lines
+    if (line.length < 3) {
+      continue;
+    }
+
+    // Skip lines that are just numbers or symbols
+    if (line.match(/^[\d\s\:\-\.\,\!\?\#\@\$\%\^\&\*\(\)]+$/)) {
+      continue;
+    }
+
+    // Clean the line of special characters
+    const cleanLine = line.replace(/^[▸►▪•\-\*\d\.\)]\s*/, '').trim();
+    
+    if (cleanLine.length < 3) {
+      continue;
     }
 
     // Try to parse exercise with sets/reps/time
-    const setsReps = parseSetsAndReps(line);
-    const timeDuration = parseTimeDuration(line);
-    const exerciseName = extractExerciseName(line);
+    const setsReps = parseSetsAndReps(cleanLine);
+    const timeDuration = parseTimeDuration(cleanLine);
+    const exerciseName = extractExerciseName(cleanLine);
 
     // Pattern 1: "Exercise Name: 3x10" or "Exercise Name - 30 sec"
     const colonDashMatch = line.match(/^([^:–-]+?)\s*[:–-]\s*(.+)$/);
@@ -427,11 +506,37 @@ function parseWorkoutFromText(text, sourceType = 'custom') {
       continue;
     }
 
-    // Pattern 6: Simple exercise name (no sets/reps, might be on next line)
-    if (inExerciseList && exerciseName.length > 2 && exerciseName.length < 50 && 
-        !exerciseName.match(/^\d+$/) && !setsReps && !timeDuration) {
+    // Pattern 6: Simple exercise name (use section timing if available)
+    if (exerciseName.length > 2 && exerciseName.length < 50 && 
+        !exerciseName.match(/^\d+$/) && !exerciseName.match(/^(workout|routine|time|equipment)/i)) {
+      
+      // Skip if it looks like a section header
+      if (lineLower.match(/^(warm up|cardio|grab|weights?|tabata|cool down|finisher|circuit|round)/i) && cleanLine.length < 25) {
+        continue;
+      }
+      
+      // Skip promotional/social media content
+      if (lineLower.match(/\b(subscribe|follow|like|join|visit|check out|find me|contact|email|dm|tag)\b/)) {
+        continue;
+      }
+      
+      // Skip descriptive lines with colons (gear lists, disclaimers, etc.)
+      if (line.includes(':') && lineLower.match(/\b(gear|watch|use|wear|love|recommend|disclaimer|warning|note)\b/)) {
+        continue;
+      }
+      
+      // Skip if it's just a single word (likely not an exercise)
+      if (!exerciseName.includes(' ') && exerciseName.length < 15) {
+        continue;
+      }
+      
+      // Skip emoji-prefixed descriptive lines (♡ My fitness watch:)
+      if (line.match(/^[♡♥❤️🖤💚💙💜🧡💛💕💖💗💘💝💞💟❣️💌]/)) {
+        continue;
+      }
+      
       // Check if next line has sets/reps
-      if (i + 1 < lines.length) {
+      if (i + 1 < lines.length && !setsReps && !timeDuration) {
         const nextLineSetsReps = parseSetsAndReps(lines[i + 1]);
         const nextLineTime = parseTimeDuration(lines[i + 1]);
         
@@ -446,16 +551,19 @@ function parseWorkoutFromText(text, sourceType = 'custom') {
         }
       }
 
-      // Just exercise name, create default
+      // Use section timing if available, otherwise create default
+      const exerciseDuration = currentSectionTiming?.work || timeDuration || 0;
+      const restPeriod = currentSectionTiming?.rest || 60;
+
       workout.exercises.push({
         name: exerciseName,
         sets: [{
-          reps: 10,
+          reps: exerciseDuration > 0 ? 0 : 10,
           weight: 0,
-          duration: 0,
-          rest: 60
+          duration: exerciseDuration,
+          rest: restPeriod
         }],
-        notes: '',
+        notes: currentSectionName ? `Section: ${currentSectionName}` : '',
         order: exerciseOrder++
       });
     }
@@ -533,31 +641,58 @@ function parseWorkoutFromText(text, sourceType = 'custom') {
 }
 
 /**
- * Fetch YouTube video description
- * Note: YouTube Data API v3 requires API key. This uses a fallback scraping method.
+ * Fetch YouTube video metadata using YouTube Data API v3
  */
-async function fetchYouTubeDescription(videoId) {
+async function fetchYouTubeMetadata(videoId) {
   try {
-    // Method 1: Try to scrape description (may not work due to YouTube's dynamic loading)
-    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
-    const response = await axios.get(videoUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
-    });
+    const apiKey = process.env.YOUTUBE_API_KEY;
     
-    const $ = cheerio.load(response.data);
-    const description = $('#description').text() || $('#watch-description-text').text();
-    
-    if (description && description.length > 20) {
-      return description;
+    if (!apiKey) {
+      console.log('No YouTube API key configured');
+      return null;
     }
+    
+    const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoId}&key=${apiKey}`;
+    const response = await axios.get(apiUrl);
+    
+    if (response.data.items && response.data.items.length > 0) {
+      const video = response.data.items[0];
+      const snippet = video.snippet;
+      const contentDetails = video.contentDetails;
+      
+      // Parse ISO 8601 duration (PT1H2M10S) to seconds
+      let durationSeconds = 0;
+      if (contentDetails?.duration) {
+        const durationMatch = contentDetails.duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+        if (durationMatch) {
+          const hours = parseInt(durationMatch[1] || 0);
+          const minutes = parseInt(durationMatch[2] || 0);
+          const seconds = parseInt(durationMatch[3] || 0);
+          durationSeconds = hours * 3600 + minutes * 60 + seconds;
+        }
+      }
+      
+      const metadata = {
+        description: snippet.description || '',
+        title: snippet.title || '',
+        channelTitle: snippet.channelTitle || '',
+        thumbnail: snippet.thumbnails?.high?.url || snippet.thumbnails?.medium?.url || snippet.thumbnails?.default?.url || '',
+        duration: durationSeconds
+      };
+      
+      console.log(`✅ Fetched YouTube metadata: ${metadata.title} by ${metadata.channelTitle}`);
+      return metadata;
+    }
+    
+    console.log('No metadata found for video:', videoId);
+    return null;
   } catch (error) {
-    console.log('Could not fetch YouTube description via scraping:', error.message);
+    console.log('Could not fetch YouTube metadata via API:', error.message);
+    if (error.response?.status === 403) {
+      console.log('⚠️  API quota may be exceeded or API key is invalid');
+    }
+    return null;
   }
-
-  // Method 2: Return empty string (user can paste description manually)
-  return '';
 }
 
 /**
@@ -573,22 +708,26 @@ async function parseYouTubeWorkout(url, captionText = '') {
 
     const videoId = videoIdMatch[1];
     
-    // Get title from oEmbed
-    let title = 'YouTube Workout';
+    // Try to fetch metadata from YouTube API
+    let metadata = null;
     try {
-      const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
-      const oembedResponse = await axios.get(oembedUrl);
-      title = oembedResponse.data.title;
+      metadata = await fetchYouTubeMetadata(videoId);
     } catch (error) {
-      console.log('Could not fetch YouTube title:', error.message);
+      console.log('Could not fetch YouTube metadata:', error.message);
     }
 
-    // Try to fetch description
-    let description = '';
-    try {
-      description = await fetchYouTubeDescription(videoId);
-    } catch (error) {
-      console.log('Could not fetch YouTube description:', error.message);
+    // Fallback to oEmbed for title if API didn't work
+    let title = metadata?.title || 'YouTube Workout';
+    let description = metadata?.description || '';
+    
+    if (!metadata) {
+      try {
+        const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+        const oembedResponse = await axios.get(oembedUrl);
+        title = oembedResponse.data.title;
+      } catch (error) {
+        console.log('Could not fetch YouTube title:', error.message);
+      }
     }
 
     // Combine all text sources
@@ -597,10 +736,18 @@ async function parseYouTubeWorkout(url, captionText = '') {
     // Parse the workout
     const workout = parseWorkoutFromText(combinedText, 'youtube');
     workout.title = title;
+    
+    // Build source object with preview metadata
     workout.source = {
       type: 'youtube',
       url: url,
-      originalText: combinedText
+      originalText: combinedText,
+      preview: {
+        thumbnail: metadata?.thumbnail || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
+        sourceTitle: metadata?.title || title,
+        sourceCreator: metadata?.channelTitle || '',
+        sourceDuration: metadata?.duration || 0
+      }
     };
 
     // Extract duration from title if not already set
@@ -614,12 +761,21 @@ async function parseYouTubeWorkout(url, captionText = '') {
     return workout;
   } catch (error) {
     // Fallback: parse just the caption text
+    const videoIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
+    const videoId = videoIdMatch ? videoIdMatch[1] : '';
+    
     const workout = parseWorkoutFromText(captionText, 'youtube');
     workout.title = workout.title || 'YouTube Workout';
     workout.source = {
       type: 'youtube',
       url: url,
-      originalText: captionText
+      originalText: captionText,
+      preview: {
+        thumbnail: videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : '',
+        sourceTitle: workout.title,
+        sourceCreator: '',
+        sourceDuration: 0
+      }
     };
     return workout;
   }
@@ -645,7 +801,13 @@ async function parseInstagramWorkout(url, captionText = '') {
     workout.source = {
       type: 'instagram',
       url: url || '',
-      originalText: captionText
+      originalText: captionText,
+      preview: {
+        thumbnail: '', // Instagram thumbnails require auth, so we'll show a placeholder in UI
+        sourceTitle: workout.title,
+        sourceCreator: '',
+        sourceDuration: 0
+      }
     };
 
     return workout;
@@ -656,7 +818,13 @@ async function parseInstagramWorkout(url, captionText = '') {
     workout.source = {
       type: 'instagram',
       url: url || '',
-      originalText: captionText
+      originalText: captionText,
+      preview: {
+        thumbnail: '',
+        sourceTitle: workout.title,
+        sourceCreator: '',
+        sourceDuration: 0
+      }
     };
     return workout;
   }

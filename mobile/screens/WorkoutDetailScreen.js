@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
 import api from '../services/api';
+import SourcePreview from '../components/SourcePreview';
 
 export default function WorkoutDetailScreen() {
   const route = useRoute();
@@ -65,6 +66,32 @@ export default function WorkoutDetailScreen() {
     }
   };
 
+  const handleDelete = () => {
+    Alert.alert(
+      'Delete Workout',
+      'Are you sure you want to delete this workout? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.delete(`/workouts/${workoutId}`);
+              Alert.alert('Success', 'Workout deleted successfully');
+              navigation.goBack();
+            } catch (error) {
+              Alert.alert('Error', error.response?.data?.message || 'Failed to delete workout');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (loading || !workout) {
     return (
       <View style={styles.container}>
@@ -76,12 +103,22 @@ export default function WorkoutDetailScreen() {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>{workout.title}</Text>
-          {workout.isPublic ? (
-            <Ionicons name="globe-outline" size={20} color="#22c55e" />
-          ) : (
-            <Ionicons name="lock-closed-outline" size={20} color="#6b7280" />
+        <View style={styles.topRow}>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>{workout.title}</Text>
+            {workout.isPublic ? (
+              <Ionicons name="globe-outline" size={20} color="#22c55e" />
+            ) : (
+              <Ionicons name="lock-closed-outline" size={20} color="#6b7280" />
+            )}
+          </View>
+          {workout.creator?._id === user?.id && (
+            <TouchableOpacity
+              style={styles.editButtonTop}
+              onPress={() => navigation.navigate('EditWorkout', { workout })}
+            >
+              <Ionicons name="create-outline" size={24} color="#22c55e" />
+            </TouchableOpacity>
           )}
         </View>
         {workout.creator && (
@@ -95,6 +132,8 @@ export default function WorkoutDetailScreen() {
         {workout.description && (
           <Text style={styles.description}>{workout.description}</Text>
         )}
+        
+        <SourcePreview source={workout.source} variant="full" />
       </View>
 
       {workout.exercises && workout.exercises.length > 0 ? (
@@ -112,7 +151,7 @@ export default function WorkoutDetailScreen() {
                     <View key={setIndex} style={styles.setItem}>
                       <Text style={styles.setText}>
                         Set {setIndex + 1}: {set.reps} reps
-                        {set.weight > 0 && ` @ ${set.weight}kg`}
+                        {set.weight > 0 && ` @ ${set.weight}lbs`}
                         {set.duration > 0 && ` (${set.duration}s)`}
                       </Text>
                     </View>
@@ -148,6 +187,16 @@ export default function WorkoutDetailScreen() {
 
       <View style={styles.actionsContainer}>
         <TouchableOpacity
+          style={[styles.actionButton, styles.startButton]}
+          onPress={() => navigation.navigate('WorkoutSession', { workout })}
+        >
+          <Ionicons name="play-circle" size={20} color="#fff" />
+          <Text style={styles.startButtonText}>Start Workout</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.actionsContainer}>
+        <TouchableOpacity
           style={[styles.actionButton, styles.saveButton, isSaved && styles.savedButton]}
           onPress={handleSave}
         >
@@ -176,6 +225,18 @@ export default function WorkoutDetailScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {workout.creator?._id === user?.id && (
+        <View style={styles.actionsContainer}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deleteButton]}
+            onPress={handleDelete}
+          >
+            <Ionicons name="trash-outline" size={20} color="#ef4444" />
+            <Text style={styles.deleteButtonText}>Delete Workout</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -191,17 +252,26 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 8,
+  },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    marginBottom: 8,
+    flex: 1,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#111827',
     flex: 1,
+  },
+  editButtonTop: {
+    padding: 4,
   },
   creatorInfo: {
     flexDirection: 'row',
@@ -217,6 +287,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#374151',
     lineHeight: 24,
+    marginBottom: 4,
   },
   exercisesContainer: {
     padding: 16,
@@ -327,6 +398,19 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#22c55e',
   },
+  startButton: {
+    backgroundColor: '#22c55e',
+    borderColor: '#22c55e',
+  },
+  startButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  editButton: {
+    backgroundColor: '#fff',
+    borderColor: '#22c55e',
+  },
   saveButton: {
     backgroundColor: '#fff',
   },
@@ -349,5 +433,14 @@ const styles = StyleSheet.create({
   },
   completedButtonText: {
     color: '#fff',
+  },
+  deleteButton: {
+    backgroundColor: '#fff',
+    borderColor: '#ef4444',
+  },
+  deleteButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ef4444',
   },
 });

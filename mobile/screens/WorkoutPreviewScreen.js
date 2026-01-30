@@ -8,6 +8,10 @@ import {
   TextInput,
   Alert,
   Switch,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -60,13 +64,23 @@ export default function WorkoutPreviewScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Review Workout</Text>
-        <Text style={styles.headerSubtitle}>
-          Found {workout.exercises.length} exercises. Edit if needed before saving.
-        </Text>
-      </View>
+    <KeyboardAvoidingView 
+      style={styles.keyboardAvoid}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <ScrollView 
+          style={styles.container}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollContent}
+        >
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>Review Workout</Text>
+            <Text style={styles.headerSubtitle}>
+              Found {workout.exercises.length} exercises. Edit if needed before saving.
+            </Text>
+          </View>
 
       <View style={styles.section}>
         <Text style={styles.label}>Workout Title</Text>
@@ -169,14 +183,23 @@ export default function WorkoutPreviewScreen() {
           </Text>
         </TouchableOpacity>
       </View>
-    </ScrollView>
+        </ScrollView>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboardAvoid: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 120,
   },
   header: {
     backgroundColor: '#fff',

@@ -65,20 +65,62 @@ router.post('/unfollow/:userId', auth, async (req, res) => {
   }
 });
 
-// Get feed (workouts from followed users)
+// Get feed (workouts from followed users + their completions)
 router.get('/feed', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
     
-    const workouts = await Workout.find({
+    // Get workouts created by followed users
+    const createdWorkouts = await Workout.find({
       creator: { $in: user.following },
       isPublic: true
     })
     .populate('creator', 'username displayName profilePicture')
     .sort({ createdAt: -1 })
-    .limit(50);
+    .limit(25)
+    .lean();
 
-    res.json(workouts);
+    // Get workouts completed by followed users
+    const completedWorkouts = await Workout.find({
+      'completedBy.user': { $in: user.following },
+      isPublic: true
+    })
+    .populate('creator', 'username displayName profilePicture')
+    .populate('completedBy.user', 'username displayName profilePicture')
+    .sort({ 'completedBy.completedAt': -1 })
+    .limit(25)
+    .lean();
+
+    // Format activities
+    const createdActivities = createdWorkouts.map(workout => ({
+      type: 'created',
+      workout: workout,
+      user: workout.creator,
+      timestamp: workout.createdAt,
+      _id: `created_${workout._id}`
+    }));
+
+    const completedActivities = [];
+    completedWorkouts.forEach(workout => {
+      workout.completedBy.forEach(completion => {
+        if (user.following.some(id => id.toString() === completion.user._id.toString())) {
+          completedActivities.push({
+            type: 'completed',
+            workout: workout,
+            user: completion.user,
+            timestamp: completion.completedAt,
+            _id: `completed_${workout._id}_${completion.user._id}`
+          });
+        }
+      });
+    });
+
+    // Combine and sort by timestamp
+    const allActivities = [...createdActivities, ...completedActivities]
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+      .slice(0, 50);
+
+    res.json(allActivities);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
