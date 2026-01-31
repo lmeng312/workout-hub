@@ -1,0 +1,30 @@
+🚨 URGENT: MongoDB Credentials Exposed on GitHub
+========================================================
+
+IMMEDIATE ACTIONS REQUIRED:
+
+1. Go to MongoDB Atlas: https://cloud.mongodb.com/
+2. Sign in to your account
+3. Navigate to: Database Access → Database Users
+4. Find user: lmeng326_db_user
+5. Click "Edit" → Change Password
+6. Generate a NEW strong password
+7. Save and update your local .env file
+
+EXPOSED CREDENTIALS (DO NOT USE):
+- Username: lmeng326_db_user
+- Password: Rfej1UzHvP0QOljp
+- Cluster: fitcommunity.ksfdnsk.mongodb.net
+
+These credentials are publicly visible at:
+https://github.com/lmeng312/workout-hub/blob/0a6b392652c728c65e3635ce632cb1b3130f5b3c/backend/scripts/testFeed.js#L10
+
+NEXT STEPS:
+1. Change MongoDB password immediately
+2. Update backend/.env with new password
+3. Fix testFeed.js to remove hardcoded credentials
+4. Remove credentials from git history
+5. Push corrected version to GitHub
+
+Created: January 31, 2026
+Status: URGENT - ACTION REQUIRED

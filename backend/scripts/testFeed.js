@@ -7,7 +7,14 @@ const Workout = require('../models/Workout');
 
 require('dotenv').config();
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://lmeng326_db_user:Rfej1UzHvP0QOljp@fitcommunity.ksfdnsk.mongodb.net/workout_app?retryWrites=true&w=majority';
+if (!process.env.MONGODB_URI) {
+  console.error('❌ ERROR: MONGODB_URI environment variable is not set!');
+  console.error('Please create a .env file in the backend directory with:');
+  console.error('MONGODB_URI=your_mongodb_connection_string');
+  process.exit(1);
+}
+
+const MONGODB_URI = process.env.MONGODB_URI;
 
 async function testFeed() {
   try {
