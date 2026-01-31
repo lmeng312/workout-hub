@@ -31,6 +31,23 @@ const exerciseSchema = new mongoose.Schema({
   order: {
     type: Number,
     required: true
+  },
+  image: {
+    type: String, // URL to image/GIF
+    default: ''
+  },
+  imageSource: {
+    type: String,
+    enum: ['auto', 'user', 'none'],
+    default: 'auto' // auto = looked up, user = uploaded by user
+  },
+  targetMuscles: [{
+    type: String,
+    trim: true
+  }],
+  equipment: {
+    type: String,
+    default: 'bodyweight'
   }
 });
 
@@ -111,6 +128,10 @@ const workoutSchema = new mongoose.Schema({
     }
   }],
   savedBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  likedBy: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],

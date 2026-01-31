@@ -2,6 +2,7 @@ const express = require('express');
 const Workout = require('../models/Workout');
 const auth = require('../middleware/auth');
 const { parseWorkoutFromText, parseYouTubeWorkout, parseInstagramWorkout } = require('../utils/workoutParser');
+const { enrichExercisesWithImages } = require('../utils/exerciseImageLookup');
 
 const router = express.Router();
 
@@ -17,7 +18,19 @@ router.get('/', auth, async (req, res) => {
     .populate('creator', 'username displayName profilePicture')
     .sort({ createdAt: -1 });
 
-    res.json(workouts);
+    // Get user's favorites
+    const User = require('../models/User');
+    const user = await User.findById(req.user._id);
+    const favoriteIds = user.favorites.map(id => id.toString());
+
+    // Add isFavorited and likedBy field to each workout
+    const workoutsWithMetadata = workouts.map(workout => ({
+      ...workout.toObject(),
+      isFavorited: favoriteIds.includes(workout._id.toString()),
+      likedBy: workout.likedBy || [] // Ensure likedBy is included
+    }));
+
+    res.json(workoutsWithMetadata);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -35,7 +48,19 @@ router.get('/library', auth, async (req, res) => {
     .populate('creator', 'username displayName profilePicture')
     .sort({ createdAt: -1 });
 
-    res.json(workouts);
+    // Get user's favorites
+    const User = require('../models/User');
+    const user = await User.findById(req.user._id);
+    const favoriteIds = user.favorites.map(id => id.toString());
+
+    // Add isFavorited and likedBy field to each workout
+    const workoutsWithMetadata = workouts.map(workout => ({
+      ...workout.toObject(),
+      isFavorited: favoriteIds.includes(workout._id.toString()),
+      likedBy: workout.likedBy || [] // Ensure likedBy is included
+    }));
+
+    res.json(workoutsWithMetadata);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -57,7 +82,15 @@ router.get('/:id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Workout not found' });
     }
 
-    res.json(workout);
+    // Check if user has favorited this workout
+    const User = require('../models/User');
+    const user = await User.findById(req.user._id);
+    const isFavorited = user.favorites.some(favId => favId.toString() === workout._id.toString());
+
+    res.json({
+      ...workout.toObject(),
+      isFavorited
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -112,6 +145,11 @@ router.post('/parse', auth, async (req, res) => {
       }
     }
 
+    // Enrich exercises with images
+    if (parsedWorkout.exercises && parsedWorkout.exercises.length > 0) {
+      parsedWorkout.exercises = enrichExercisesWithImages(parsedWorkout.exercises);
+    }
+
     const workout = new Workout({
       ...parsedWorkout,
       creator: req.user._id,
@@ -134,8 +172,14 @@ router.post('/parse', auth, async (req, res) => {
 // Create custom workout
 router.post('/', auth, async (req, res) => {
   try {
+    // Enrich exercises with images if not already provided
+    const workoutData = { ...req.body };
+    if (workoutData.exercises && workoutData.exercises.length > 0) {
+      workoutData.exercises = enrichExercisesWithImages(workoutData.exercises);
+    }
+
     const workout = new Workout({
-      ...req.body,
+      ...workoutData,
       creator: req.user._id
     });
 
@@ -160,7 +204,13 @@ router.put('/:id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Workout not found' });
     }
 
-    Object.assign(workout, req.body);
+    // Enrich exercises with images if not already provided
+    const updateData = { ...req.body };
+    if (updateData.exercises && updateData.exercises.length > 0) {
+      updateData.exercises = enrichExercisesWithImages(updateData.exercises);
+    }
+
+    Object.assign(workout, updateData);
     await workout.save();
     await workout.populate('creator', 'username displayName profilePicture');
 
@@ -248,6 +298,166 @@ router.post('/:id/unsave', auth, async (req, res) => {
     await workout.save();
 
     res.json(workout);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Favorite workout
+router.post('/:id/favorite', auth, async (req, res) => {
+  try {
+    const workout = await Workout.findById(req.params.id);
+    if (!workout) {
+      return res.status(404).json({ message: 'Workout not found' });
+    }
+
+    const User = require('../models/User');
+    const user = await User.findById(req.user._id);
+    
+    if (!user.favorites.includes(req.params.id)) {
+      user.favorites.push(req.params.id);
+      await user.save();
+    }
+
+    res.json({ message: 'Workout favorited', isFavorited: true });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Unfavorite workout
+router.post('/:id/unfavorite', auth, async (req, res) => {
+  try {
+    const User = require('../models/User');
+    const user = await User.findById(req.user._id);
+    
+    user.favorites = user.favorites.filter(
+      workoutId => workoutId.toString() !== req.params.id
+    );
+    await user.save();
+
+    res.json({ message: 'Workout unfavorited', isFavorited: false });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get user's favorite workouts
+router.get('/favorites/list', auth, async (req, res) => {
+  try {
+    const User = require('../models/User');
+    const user = await User.findById(req.user._id).populate({
+      path: 'favorites',
+      populate: {
+        path: 'creator',
+        select: 'username displayName profilePicture'
+      }
+    });
+
+    res.json(user.favorites || []);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Refresh exercise images for a workout (useful for existing workouts)
+router.post('/:id/refresh-images', auth, async (req, res) => {
+  try {
+    const workout = await Workout.findById(req.params.id);
+    if (!workout) {
+      return res.status(404).json({ message: 'Workout not found' });
+    }
+
+    // Only allow creator to refresh images
+    if (workout.creator.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Not authorized to modify this workout' });
+    }
+
+    // Enrich exercises with images
+    if (workout.exercises && workout.exercises.length > 0) {
+      workout.exercises = enrichExercisesWithImages(workout.exercises);
+      await workout.save();
+    }
+
+    res.json({ 
+      message: 'Images refreshed successfully',
+      workout: workout
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Like workout
+router.post('/:id/like', auth, async (req, res) => {
+  try {
+    const workout = await Workout.findById(req.params.id);
+    if (!workout) {
+      return res.status(404).json({ message: 'Workout not found' });
+    }
+
+    if (!workout.likedBy.includes(req.user._id)) {
+      workout.likedBy.push(req.user._id);
+      await workout.save();
+    }
+
+    res.json({ message: 'Workout liked', likesCount: workout.likedBy.length });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Unlike workout
+router.post('/:id/unlike', auth, async (req, res) => {
+  try {
+    const workout = await Workout.findById(req.params.id);
+    if (!workout) {
+      return res.status(404).json({ message: 'Workout not found' });
+    }
+
+    workout.likedBy = workout.likedBy.filter(
+      userId => userId.toString() !== req.user._id.toString()
+    );
+    await workout.save();
+
+    res.json({ message: 'Workout unliked', likesCount: workout.likedBy.length });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Duplicate workout
+router.post('/:id/duplicate', auth, async (req, res) => {
+  try {
+    const originalWorkout = await Workout.findById(req.params.id);
+    if (!originalWorkout) {
+      return res.status(404).json({ message: 'Workout not found' });
+    }
+
+    // Create a new workout with the same data but new creator
+    const duplicatedWorkout = new Workout({
+      title: `${originalWorkout.title} (Copy)`,
+      description: originalWorkout.description,
+      exercises: originalWorkout.exercises,
+      tags: originalWorkout.tags,
+      estimatedDuration: originalWorkout.estimatedDuration,
+      difficulty: originalWorkout.difficulty,
+      creator: req.user._id,
+      isPublic: false, // Make copies private by default
+      source: {
+        type: 'custom',
+        url: '',
+        originalText: `Duplicated from workout by ${originalWorkout.creator}`
+      }
+    });
+
+    await duplicatedWorkout.save();
+    await duplicatedWorkout.populate('creator', 'username displayName profilePicture');
+
+    res.status(201).json({
+      message: 'Workout duplicated successfully',
+      workout: duplicatedWorkout
+    });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

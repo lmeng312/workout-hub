@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -22,6 +23,7 @@ export default function WorkoutDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
 
   useEffect(() => {
     loadWorkout();
@@ -34,6 +36,7 @@ export default function WorkoutDetailScreen() {
       const currentUserId = user?.id;
       setIsSaved(response.data.savedBy?.some(userId => userId.toString() === currentUserId) || false);
       setIsCompleted(response.data.completedBy?.some(completion => completion.user?.toString() === currentUserId) || false);
+      setIsFavorited(response.data.isFavorited || false);
     } catch (error) {
       Alert.alert('Error', 'Failed to load workout');
       navigation.goBack();
@@ -53,6 +56,20 @@ export default function WorkoutDetailScreen() {
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to update save status');
+    }
+  };
+
+  const handleFavorite = async () => {
+    try {
+      if (isFavorited) {
+        await api.post(`/workouts/${workoutId}/unfavorite`);
+        setIsFavorited(false);
+      } else {
+        await api.post(`/workouts/${workoutId}/favorite`);
+        setIsFavorited(true);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update favorite status');
     }
   };
 
@@ -112,18 +129,30 @@ export default function WorkoutDetailScreen() {
               <Ionicons name="lock-closed-outline" size={20} color="#6b7280" />
             )}
           </View>
-          {workout.creator?._id === user?.id && (
+          <View style={styles.headerActions}>
             <TouchableOpacity
-              style={styles.editButtonTop}
-              onPress={() => navigation.navigate('EditWorkout', { workout })}
+              style={styles.favoriteButtonTop}
+              onPress={handleFavorite}
             >
-              <Ionicons name="create-outline" size={24} color="#22c55e" />
+              <Ionicons
+                name={isFavorited ? 'heart' : 'heart-outline'}
+                size={28}
+                color="#ef4444"
+              />
             </TouchableOpacity>
-          )}
+            {workout.creator?._id === user?.id && (
+              <TouchableOpacity
+                style={styles.editButtonTop}
+                onPress={() => navigation.navigate('EditWorkout', { workout })}
+              >
+                <Ionicons name="create-outline" size={24} color="#22c55e" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
         {workout.creator && (
           <View style={styles.creatorInfo}>
-            <Ionicons name="person-outline" size={16} color="#6b7280" />
+            <Ionicons name="person-outline" size={16} color="#94a3b8" />
             <Text style={styles.creatorText}>
               {workout.creator.displayName || workout.creator.username}
             </Text>
@@ -142,7 +171,16 @@ export default function WorkoutDetailScreen() {
           {workout.exercises.map((exercise, index) => (
             <View key={index} style={styles.exerciseCard}>
               <View style={styles.exerciseHeader}>
-                <Text style={styles.exerciseName}>{exercise.name}</Text>
+                <View style={styles.exerciseNameContainer}>
+                  {exercise.image && (
+                    <Image
+                      source={{ uri: exercise.image }}
+                      style={styles.exerciseImage}
+                      resizeMode="cover"
+                    />
+                  )}
+                  <Text style={styles.exerciseName}>{exercise.name}</Text>
+                </View>
                 <Text style={styles.exerciseOrder}>{index + 1}</Text>
               </View>
               {exercise.sets && exercise.sets.length > 0 && (
@@ -185,6 +223,20 @@ export default function WorkoutDetailScreen() {
         </View>
       )}
 
+      {/* Activity Stats */}
+      <View style={styles.statsContainer}>
+        <Text style={styles.sectionTitle}>Activity</Text>
+        <View style={styles.statsGrid}>
+          {workout.completedBy && workout.completedBy.length > 0 && (
+            <View style={styles.statItem}>
+              <Ionicons name="checkmark-circle" size={24} color="#22c55e" />
+              <Text style={styles.statValue}>{workout.completedBy.length}</Text>
+              <Text style={styles.statLabel}>Completed</Text>
+            </View>
+          )}
+        </View>
+      </View>
+
       <View style={styles.actionsContainer}>
         <TouchableOpacity
           style={[styles.actionButton, styles.startButton]}
@@ -192,37 +244,6 @@ export default function WorkoutDetailScreen() {
         >
           <Ionicons name="play-circle" size={20} color="#fff" />
           <Text style={styles.startButtonText}>Start Workout</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.saveButton, isSaved && styles.savedButton]}
-          onPress={handleSave}
-        >
-          <Ionicons
-            name={isSaved ? 'bookmark' : 'bookmark-outline'}
-            size={20}
-            color={isSaved ? '#fff' : '#22c55e'}
-          />
-          <Text style={[styles.actionButtonText, isSaved && styles.savedButtonText]}>
-            {isSaved ? 'Saved' : 'Save'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.actionButton, styles.completeButton, isCompleted && styles.completedButton]}
-          onPress={handleComplete}
-          disabled={isCompleted}
-        >
-          <Ionicons
-            name={isCompleted ? 'checkmark-circle' : 'checkmark-circle-outline'}
-            size={20}
-            color={isCompleted ? '#fff' : '#22c55e'}
-          />
-          <Text style={[styles.actionButtonText, isCompleted && styles.completedButtonText]}>
-            {isCompleted ? 'Completed' : 'Mark Complete'}
-          </Text>
         </TouchableOpacity>
       </View>
 
@@ -244,13 +265,13 @@ export default function WorkoutDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#0f172a',
   },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: '#1e293b',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#334155',
   },
   topRow: {
     flexDirection: 'row',
@@ -267,8 +288,16 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#fff',
     flex: 1,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  favoriteButtonTop: {
+    padding: 4,
   },
   editButtonTop: {
     padding: 4,
@@ -281,11 +310,11 @@ const styles = StyleSheet.create({
   },
   creatorText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#94a3b8',
   },
   description: {
     fontSize: 16,
-    color: '#374151',
+    color: '#e2e8f0',
     lineHeight: 24,
     marginBottom: 4,
   },
@@ -295,19 +324,16 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#fff',
     marginBottom: 16,
   },
   exerciseCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#1e293b',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#334155',
   },
   exerciseHeader: {
     flexDirection: 'row',
@@ -315,17 +341,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  exerciseNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  exerciseImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#0f172a',
+  },
   exerciseName: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: '#fff',
     flex: 1,
   },
   exerciseOrder: {
     fontSize: 14,
     fontWeight: '600',
     color: '#22c55e',
-    backgroundColor: '#dcfce7',
+    backgroundColor: '#166534',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -336,15 +374,15 @@ const styles = StyleSheet.create({
   setItem: {
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: '#334155',
   },
   setText: {
     fontSize: 14,
-    color: '#374151',
+    color: '#e2e8f0',
   },
   exerciseNotes: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#94a3b8',
     fontStyle: 'italic',
     marginTop: 8,
   },
@@ -355,12 +393,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#6b7280',
+    color: '#94a3b8',
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#64748b',
     marginTop: 8,
   },
   tagsContainer: {
@@ -372,14 +410,42 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tag: {
-    backgroundColor: '#dcfce7',
+    backgroundColor: '#166534',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
   },
   tagText: {
     fontSize: 14,
-    color: '#166534',
+    color: '#dcfce7',
+    fontWeight: '500',
+  },
+  statsContainer: {
+    padding: 16,
+    backgroundColor: '#1e293b',
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+    marginBottom: 16,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+  },
+  statItem: {
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+  },
+  statValue: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 4,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: '#94a3b8',
     fontWeight: '500',
   },
   actionsContainer: {
@@ -397,6 +463,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#22c55e',
+    backgroundColor: '#1e293b',
   },
   startButton: {
     backgroundColor: '#22c55e',
@@ -408,17 +475,25 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   editButton: {
-    backgroundColor: '#fff',
+    backgroundColor: '#1e293b',
     borderColor: '#22c55e',
   },
   saveButton: {
-    backgroundColor: '#fff',
+    backgroundColor: '#1e293b',
   },
   savedButton: {
     backgroundColor: '#22c55e',
   },
+  favoriteButton: {
+    backgroundColor: '#1e293b',
+    borderColor: '#ef4444',
+  },
+  favoritedButton: {
+    backgroundColor: '#ef4444',
+    borderColor: '#ef4444',
+  },
   completeButton: {
-    backgroundColor: '#fff',
+    backgroundColor: '#1e293b',
   },
   completedButton: {
     backgroundColor: '#22c55e',
@@ -428,6 +503,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#22c55e',
   },
+  favoriteButtonText: {
+    color: '#ef4444',
+  },
+  favoritedButtonText: {
+    color: '#fff',
+  },
   savedButtonText: {
     color: '#fff',
   },
@@ -435,7 +516,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   deleteButton: {
-    backgroundColor: '#fff',
+    backgroundColor: '#1e293b',
     borderColor: '#ef4444',
   },
   deleteButtonText: {

@@ -50,6 +50,7 @@ export default function LibraryScreen() {
     const isSaved = !isOwned && item.savedBy && item.savedBy.some(
       userId => userId.toString() === currentUserId
     );
+    const isFavorited = item.isFavorited || false;
     const hasThumbnail = item.source?.preview?.thumbnail;
 
     return (
@@ -63,6 +64,12 @@ export default function LibraryScreen() {
               <View style={styles.workoutTitleContainer}>
                 <Text style={styles.workoutTitle}>{item.title}</Text>
                 <View style={styles.badgesRow}>
+                  {isFavorited && (
+                    <View style={styles.favoritedBadge}>
+                      <Ionicons name="heart" size={12} color="#ef4444" />
+                      <Text style={styles.favoritedText}>Favorited</Text>
+                    </View>
+                  )}
                   {isSaved && !isOwned && (
                     <View style={styles.savedBadge}>
                       <Ionicons name="bookmark" size={12} color="#22c55e" />
@@ -90,6 +97,12 @@ export default function LibraryScreen() {
                 <Ionicons name="barbell-outline" size={16} color="#6b7280" />
                 <Text style={styles.metaText}>{item.exercises?.length || 0} exercises</Text>
               </View>
+              {item.likedBy && item.likedBy.length > 0 && (
+                <View style={styles.metaItem}>
+                  <Ionicons name="heart" size={16} color="#ef4444" />
+                  <Text style={[styles.metaText, styles.likedText]}>{item.likedBy.length}</Text>
+                </View>
+              )}
               {item.creator && (
                 <View style={styles.metaItem}>
                   <Ionicons name="person-outline" size={16} color="#6b7280" />
@@ -155,21 +168,22 @@ export default function LibraryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#0f172a',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
+    padding: 20,
+    paddingTop: 60,
+    backgroundColor: '#0f172a',
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#334155',
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#fff',
   },
   addButton: {
     padding: 4,
@@ -178,15 +192,12 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   workoutCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#1e293b',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#334155',
   },
   contentRow: {
     flexDirection: 'row',
@@ -209,7 +220,7 @@ const styles = StyleSheet.create({
   workoutTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#fff',
   },
   badgesRow: {
     flexDirection: 'row',
@@ -220,7 +231,7 @@ const styles = StyleSheet.create({
   savedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#dcfce7',
+    backgroundColor: '#166534',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
@@ -228,12 +239,26 @@ const styles = StyleSheet.create({
   },
   savedText: {
     fontSize: 10,
-    color: '#166534',
+    color: '#dcfce7',
+    fontWeight: '600',
+  },
+  favoritedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#7f1d1d',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    gap: 4,
+  },
+  favoritedText: {
+    fontSize: 10,
+    color: '#fee2e2',
     fontWeight: '600',
   },
   workoutDescription: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#94a3b8',
     marginBottom: 12,
   },
   workoutMeta: {
@@ -247,7 +272,11 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#94a3b8',
+  },
+  likedText: {
+    color: '#ef4444',
+    fontWeight: '600',
   },
   thumbnailContainer: {
     position: 'relative',
@@ -255,7 +284,9 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#0f172a',
+    borderWidth: 1,
+    borderColor: '#334155',
   },
   thumbnail: {
     width: '100%',
@@ -283,12 +314,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#6b7280',
+    color: '#94a3b8',
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#64748b',
     marginTop: 8,
   },
 });

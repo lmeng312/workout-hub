@@ -65,31 +65,56 @@ router.post('/unfollow/:userId', auth, async (req, res) => {
   }
 });
 
-// Get feed (workouts from followed users + their completions)
+// Get feed (workouts from followed users + their completions + own activities)
 router.get('/feed', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
     
-    // Get workouts created by followed users
+    console.log(`📱 Feed request from user: ${user.username} (${user._id})`);
+    console.log(`👥 Following ${user.following.length} users`);
+    
+    // Include both followed users AND the current user
+    const feedUserIds = [...user.following, req.user._id];
+    
+    // Get workouts created by followed users AND current user
     const createdWorkouts = await Workout.find({
-      creator: { $in: user.following },
-      isPublic: true
+      $or: [
+        { creator: { $in: user.following }, isPublic: true }, // Friends' public workouts
+        { creator: req.user._id } // All of current user's workouts (public or private)
+      ]
     })
     .populate('creator', 'username displayName profilePicture')
     .sort({ createdAt: -1 })
     .limit(25)
     .lean();
+    
+    console.log(`📝 Found ${createdWorkouts.length} created workouts`);
 
-    // Get workouts completed by followed users
+    // Get workouts completed by followed users AND current user
     const completedWorkouts = await Workout.find({
-      'completedBy.user': { $in: user.following },
-      isPublic: true
+      $or: [
+        { 'completedBy.user': { $in: user.following }, isPublic: true }, // Friends' public completions
+        { 'completedBy.user': req.user._id } // All of current user's completions
+      ]
     })
     .populate('creator', 'username displayName profilePicture')
     .populate('completedBy.user', 'username displayName profilePicture')
     .sort({ 'completedBy.completedAt': -1 })
     .limit(25)
     .lean();
+    
+    console.log(`✅ Found ${completedWorkouts.length} completed workouts`);
+    
+    // Count user's own completions
+    let userCompletionCount = 0;
+    completedWorkouts.forEach(w => {
+      w.completedBy.forEach(c => {
+        if (c.user._id.toString() === req.user._id.toString()) {
+          userCompletionCount++;
+        }
+      });
+    });
+    console.log(`👤 User has ${userCompletionCount} completions in results`);
 
     // Format activities
     const createdActivities = createdWorkouts.map(workout => ({
@@ -103,7 +128,8 @@ router.get('/feed', auth, async (req, res) => {
     const completedActivities = [];
     completedWorkouts.forEach(workout => {
       workout.completedBy.forEach(completion => {
-        if (user.following.some(id => id.toString() === completion.user._id.toString())) {
+        // Include completions from followed users AND current user
+        if (feedUserIds.some(id => id.toString() === completion.user._id.toString())) {
           completedActivities.push({
             type: 'completed',
             workout: workout,
@@ -114,14 +140,28 @@ router.get('/feed', auth, async (req, res) => {
         }
       });
     });
+    
+    console.log(`🎯 Total activities: ${createdActivities.length + completedActivities.length} (${createdActivities.length} created + ${completedActivities.length} completed)`);
 
-    // Combine and sort by timestamp
-    const allActivities = [...createdActivities, ...completedActivities]
+    // Get user's favorites
+    const favoriteIds = user.favorites.map(id => id.toString());
+
+    // Add isFavorited and likedBy field to all activities
+    const activitiesWithFavorites = [...createdActivities, ...completedActivities]
+      .map(activity => ({
+        ...activity,
+        workout: {
+          ...activity.workout,
+          isFavorited: favoriteIds.includes(activity.workout._id.toString()),
+          likedBy: activity.workout.likedBy || []
+        }
+      }))
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
       .slice(0, 50);
 
-    res.json(allActivities);
+    res.json(activitiesWithFavorites);
   } catch (error) {
+    console.error('❌ Feed error:', error);
     res.status(500).json({ message: error.message });
   }
 });

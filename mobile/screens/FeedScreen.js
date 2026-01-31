@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   Text,
@@ -7,14 +7,17 @@ import {
   TouchableOpacity,
   RefreshControl,
   Image,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { AuthContext } from '../context/AuthContext';
 import api from '../services/api';
 import SourcePreview from '../components/SourcePreview';
 
 export default function FeedScreen() {
   const navigation = useNavigation();
+  const { user } = useContext(AuthContext);
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -40,128 +43,188 @@ export default function FeedScreen() {
     loadFeed();
   };
 
-  const renderActivity = ({ item }) => {
+  const handleLike = async (workoutId, index) => {
+    try {
+      const activity = activities[index];
+      const isLiked = activity.workout.likedBy?.includes(user?.id);
+      
+      if (isLiked) {
+        await api.post(`/workouts/${workoutId}/unlike`);
+      } else {
+        await api.post(`/workouts/${workoutId}/like`);
+      }
+      
+      // Update local state
+      const updatedActivities = [...activities];
+      if (isLiked) {
+        updatedActivities[index].workout.likedBy = activity.workout.likedBy.filter(id => id !== user?.id);
+      } else {
+        updatedActivities[index].workout.likedBy = [...(activity.workout.likedBy || []), user?.id];
+      }
+      setActivities(updatedActivities);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update like status');
+    }
+  };
+
+  const handleDuplicate = async (workoutId) => {
+    try {
+      const response = await api.post(`/workouts/${workoutId}/duplicate`);
+      Alert.alert(
+        'Success!',
+        'Workout duplicated to your library',
+        [
+          { text: 'View in Library', onPress: () => navigation.navigate('Library') },
+          { text: 'OK', style: 'cancel' }
+        ]
+      );
+      loadFeed(); // Refresh feed
+    } catch (error) {
+      Alert.alert('Error', 'Failed to duplicate workout');
+    }
+  };
+
+  const renderActivity = ({ item, index }) => {
     const isCompleted = item.type === 'completed';
     const workout = item.workout;
-    const user = item.user;
+    const creator = item.user;
+    const isLiked = workout.likedBy?.includes(user?.id);
+    const likesCount = workout.likedBy?.length || 0;
+    const completionsCount = workout.completedBy?.length || 0;
 
-    const hasThumbnail = workout.source?.preview?.thumbnail;
-    const getSourceColor = () => {
-      switch (workout.source?.type) {
-        case 'youtube':
-          return '#FF0000';
-        case 'instagram':
-          return '#E4405F';
-        default:
-          return '#6b7280';
+    // Get difficulty badge color
+    const getDifficultyColor = () => {
+      switch (workout.difficulty) {
+        case 'beginner': return '#22c55e';
+        case 'intermediate': return '#f59e0b';
+        case 'advanced': return '#ef4444';
+        default: return '#6b7280';
       }
     };
 
     return (
-      <TouchableOpacity
-        style={styles.workoutCard}
-        onPress={() => navigation.navigate('WorkoutDetail', { workoutId: workout._id })}
-      >
-        <View style={styles.workoutHeader}>
-          <View style={styles.creatorHeader}>
+      <View style={styles.activityCard}>
+        {/* User Header */}
+        <View style={styles.userHeader}>
+          <View style={styles.userInfo}>
             <View style={styles.avatar}>
-              {user?.profilePicture ? (
+              {creator?.profilePicture ? (
                 <Text style={styles.avatarText}>
-                  {user.displayName?.[0] || user.username?.[0]}
+                  {creator.displayName?.[0] || creator.username?.[0]}
                 </Text>
               ) : (
                 <Ionicons name="person" size={20} color="#22c55e" />
               )}
             </View>
-            <View style={styles.headerTextContainer}>
-              <View style={styles.activityRow}>
-                <Text style={styles.creatorName}>
-                  {user?.displayName || user?.username}
-                </Text>
-                {isCompleted ? (
-                  <>
-                    <Text style={styles.activityText}> completed </Text>
-                    <Ionicons name="checkmark-circle" size={16} color="#22c55e" />
-                  </>
-                ) : (
-                  <Text style={styles.activityText}> created</Text>
-                )}
-              </View>
-              <Text style={styles.workoutTime}>
+            <View style={styles.userTextContainer}>
+              <Text style={styles.userName}>
+                {creator?.displayName || creator?.username}
+              </Text>
+              <Text style={styles.activityDate}>
                 {new Date(item.timestamp).toLocaleDateString()}
               </Text>
             </View>
           </View>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.actionIconButton}
+              onPress={() => handleLike(workout._id, index)}
+            >
+              <Ionicons
+                name={isLiked ? 'heart' : 'heart-outline'}
+                size={24}
+                color="#ef4444"
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.actionIconButton}
+              onPress={() => handleDuplicate(workout._id)}
+            >
+              <Ionicons name="copy-outline" size={24} color="#94a3b8" />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <View style={styles.contentRow}>
-          <View style={styles.textContent}>
-            <View style={styles.titleRow}>
-              <Text style={styles.workoutTitle}>{workout.title}</Text>
-              <SourcePreview source={workout.source} variant="badge" />
-            </View>
-            
-            {workout.description && (
-              <Text style={styles.workoutDescription} numberOfLines={2}>
-                {workout.description}
+        {/* Workout Card */}
+        <TouchableOpacity
+          style={styles.workoutContent}
+          onPress={() => navigation.navigate('WorkoutDetail', { workoutId: workout._id })}
+          activeOpacity={0.9}
+        >
+          {/* Title & Source Badge */}
+          <View style={styles.workoutTitleRow}>
+            <Text style={styles.workoutTitle}>{workout.title}</Text>
+            <SourcePreview source={workout.source} variant="badge" />
+          </View>
+
+          {/* Description */}
+          {workout.description && (
+            <Text style={styles.workoutDescription} numberOfLines={2}>
+              {workout.description}
+            </Text>
+          )}
+
+          {/* Exercise List Preview */}
+          <View style={styles.exercisesPreview}>
+            {workout.exercises?.slice(0, 3).map((exercise, idx) => (
+              <View key={idx} style={styles.exerciseRow}>
+                <Text style={styles.exerciseName}>{exercise.name}</Text>
+                <Text style={styles.exerciseDetails}>
+                  {exercise.sets?.[0]?.reps && `${exercise.sets.length} × ${exercise.sets[0].reps}`}
+                </Text>
+              </View>
+            ))}
+            {workout.exercises?.length > 3 && (
+              <Text style={styles.moreExercises}>
+                +{workout.exercises.length - 3} more exercises
               </Text>
             )}
           </View>
-          
-          {hasThumbnail && (
-            <View style={styles.thumbnailContainer}>
-              <Image
-                source={{ uri: workout.source.preview.thumbnail }}
-                style={styles.thumbnail}
-                resizeMode="cover"
-              />
-              {workout.source.preview.sourceDuration > 0 && (
-                <View style={styles.durationBadge}>
-                  <Text style={styles.durationText}>
-                    {Math.floor(workout.source.preview.sourceDuration / 60)}:{(workout.source.preview.sourceDuration % 60).toString().padStart(2, '0')}
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
-        </View>
 
-        <View style={styles.workoutMeta}>
-          <View style={styles.metaItem}>
-            <Ionicons name="barbell-outline" size={16} color="#6b7280" />
-            <Text style={styles.metaText}>{workout.exercises?.length || 0} exercises</Text>
-          </View>
-          {workout.estimatedDuration && (
-            <View style={styles.metaItem}>
-              <Ionicons name="time-outline" size={16} color="#6b7280" />
-              <Text style={styles.metaText}>{workout.estimatedDuration} min</Text>
+          {/* Stats Row */}
+          <View style={styles.statsRow}>
+            <View style={styles.statBadge}>
+              <Ionicons name="barbell-outline" size={14} color="#94a3b8" />
+              <Text style={styles.statText}>{workout.exercises?.length || 0} exercises</Text>
             </View>
-          )}
-          {workout.completedBy && workout.completedBy.length > 0 && (
-            <View style={styles.metaItem}>
-              <Ionicons name="checkmark-circle-outline" size={16} color="#22c55e" />
-              <Text style={styles.metaText}>{workout.completedBy.length} completed</Text>
+            <View style={styles.statBadge}>
+              <Ionicons name="time-outline" size={14} color="#94a3b8" />
+              <Text style={styles.statText}>{workout.estimatedDuration || 25} min</Text>
             </View>
-          )}
-        </View>
-
-        {workout.tags && workout.tags.length > 0 && (
-          <View style={styles.tagsContainer}>
-            {workout.tags.slice(0, 3).map((tag, index) => (
-              <View key={index} style={styles.tag}>
-                <Text style={styles.tagText}>{tag}</Text>
+            {completionsCount > 0 && (
+              <View style={[styles.statBadge, styles.completionsBadge]}>
+                <Ionicons name="checkmark-circle" size={14} color="#22c55e" />
+                <Text style={[styles.statText, styles.completionsText]}>
+                  {completionsCount} {completionsCount === 1 ? 'completion' : 'completions'}
+                </Text>
               </View>
-            ))}
+            )}
+            <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor() + '20' }]}>
+              <Text style={[styles.difficultyText, { color: getDifficultyColor() }]}>
+                {workout.difficulty || 'intermediate'}
+              </Text>
+            </View>
           </View>
-        )}
-      </TouchableOpacity>
+        </TouchableOpacity>
+
+        {/* Start Workout Button */}
+        <View style={styles.actionsRow}>
+          <TouchableOpacity
+            style={styles.startButton}
+            onPress={() => navigation.navigate('WorkoutSession', { workout })}
+          >
+            <Ionicons name="play" size={18} color="#fff" />
+            <Text style={styles.startButtonText}>Start Workout</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     );
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Friends' Workouts</Text>
+        <Text style={styles.headerTitle}>Your Feed</Text>
         <Text style={styles.headerSubtitle}>See what your friends are doing</Text>
       </View>
 
@@ -178,7 +241,7 @@ export default function FeedScreen() {
             <Ionicons name="people-outline" size={64} color="#d1d5db" />
             <Text style={styles.emptyText}>No activity in your feed</Text>
             <Text style={styles.emptySubtext}>
-              Follow friends to see their workouts and completions here!
+              Complete workouts or follow friends to see activities here!
             </Text>
           </View>
         }
@@ -190,167 +253,236 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#0f172a',
   },
   header: {
-    padding: 16,
-    backgroundColor: '#fff',
+    padding: 20,
+    paddingTop: 60,
+    backgroundColor: '#0f172a',
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#334155',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#fff',
   },
   headerSubtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#94a3b8',
     marginTop: 4,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
   },
   list: {
     padding: 16,
   },
-  workoutCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+  activityCard: {
+    backgroundColor: '#1e293b',
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  userHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    paddingBottom: 12,
+    backgroundColor: '#1e293b',
   },
-  workoutHeader: {
-    marginBottom: 12,
-  },
-  creatorHeader: {
+  userInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-  },
-  headerTextContainer: {
     flex: 1,
-  },
-  activityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  activityText: {
-    fontSize: 14,
-    color: '#6b7280',
   },
   avatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#dcfce7',
+    backgroundColor: '#8b5cf6',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#22c55e',
+    color: '#fff',
   },
-  creatorName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  workoutTime: {
-    fontSize: 12,
-    color: '#6b7280',
-  },
-  contentRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-  },
-  textContent: {
+  userTextContainer: {
+    gap: 2,
     flex: 1,
   },
-  titleRow: {
+  userName: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  activityDate: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+  headerActions: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    gap: 12,
+  },
+  actionIconButton: {
+    padding: 4,
+  },
+  moreButton: {
+    padding: 4,
+  },
+  workoutContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: '#1e293b',
+  },
+  workoutTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 8,
     gap: 8,
-    marginBottom: 6,
   },
   workoutTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#fff',
     flex: 1,
   },
   workoutDescription: {
     fontSize: 14,
-    color: '#6b7280',
+    color: '#94a3b8',
     lineHeight: 20,
-    marginBottom: 8,
-  },
-  thumbnailContainer: {
-    position: 'relative',
-    width: 100,
-    height: 75,
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#f3f4f6',
-  },
-  thumbnail: {
-    width: '100%',
-    height: '100%',
-  },
-  durationBadge: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  durationText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  workoutMeta: {
-    flexDirection: 'row',
-    gap: 16,
     marginBottom: 12,
   },
-  metaItem: {
+  exercisesPreview: {
+    backgroundColor: '#0f172a',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  exerciseRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  exerciseName: {
+    fontSize: 14,
+    color: '#e2e8f0',
+    flex: 1,
+  },
+  exerciseDetails: {
+    fontSize: 13,
+    color: '#94a3b8',
+    fontWeight: '500',
+  },
+  moreExercises: {
+    fontSize: 13,
+    color: '#22c55e',
+    fontWeight: '500',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+    flexWrap: 'wrap',
+  },
+  statBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    backgroundColor: '#0f172a',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
   },
-  metaText: {
+  statText: {
     fontSize: 12,
-    color: '#6b7280',
+    color: '#94a3b8',
+    fontWeight: '500',
   },
-  tagsContainer: {
+  completionsBadge: {
+    backgroundColor: '#166534',
+    borderColor: '#22c55e',
+  },
+  completionsText: {
+    color: '#dcfce7',
+    fontWeight: '600',
+  },
+  difficultyBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  difficultyText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  completionBadge: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#166534',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
-  tag: {
-    backgroundColor: '#dcfce7',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+  completionText: {
+    fontSize: 13,
+    color: '#dcfce7',
+    fontWeight: '600',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#334155',
+    backgroundColor: '#1e293b',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  actionText: {
+    fontSize: 13,
+    color: '#94a3b8',
+    fontWeight: '500',
+  },
+  actionTextActive: {
+    color: '#ef4444',
+    fontWeight: '600',
+  },
+  startButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#22c55e',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     borderRadius: 12,
   },
-  tagText: {
-    fontSize: 12,
-    color: '#166534',
-    fontWeight: '500',
+  startButtonText: {
+    fontSize: 16,
+    color: '#fff',
+    fontWeight: '600',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -360,13 +492,14 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#6b7280',
+    color: '#94a3b8',
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#9ca3af',
+    color: '#64748b',
     marginTop: 8,
     textAlign: 'center',
+    paddingHorizontal: 32,
   },
 });

@@ -97,27 +97,27 @@ export default function ProfileScreen() {
 
       <View style={styles.menuContainer}>
         <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="person-outline" size={24} color="#22c55e" />
+          <Ionicons name="person-outline" size={24} color="#8b5cf6" />
           <Text style={styles.menuText}>Edit Profile</Text>
-          <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          <Ionicons name="chevron-forward" size={20} color="#64748b" />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="people-outline" size={24} color="#22c55e" />
+          <Ionicons name="people-outline" size={24} color="#8b5cf6" />
           <Text style={styles.menuText}>Find Friends</Text>
-          <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          <Ionicons name="chevron-forward" size={20} color="#64748b" />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem}>
-          <Ionicons name="settings-outline" size={24} color="#22c55e" />
+          <Ionicons name="settings-outline" size={24} color="#8b5cf6" />
           <Text style={styles.menuText}>Settings</Text>
-          <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          <Ionicons name="chevron-forward" size={20} color="#64748b" />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={handleLogout}>
           <Ionicons name="log-out-outline" size={24} color="#ef4444" />
           <Text style={[styles.menuText, styles.logoutText]}>Logout</Text>
-          <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+          <Ionicons name="chevron-forward" size={20} color="#64748b" />
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -127,14 +127,15 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#0f172a',
   },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: '#1e293b',
     alignItems: 'center',
     padding: 24,
+    paddingTop: 60,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#334155',
   },
   avatarContainer: {
     marginBottom: 16,
@@ -143,42 +144,43 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#dcfce7',
+    backgroundColor: '#8b5cf6',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#22c55e',
+    color: '#fff',
   },
   name: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#fff',
     marginBottom: 4,
   },
   username: {
     fontSize: 16,
-    color: '#6b7280',
+    color: '#94a3b8',
     marginBottom: 8,
   },
   bio: {
     fontSize: 14,
-    color: '#374151',
+    color: '#e2e8f0',
     textAlign: 'center',
     marginTop: 8,
   },
   statsContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: '#1e293b',
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: '#334155',
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
     padding: 16,
+    paddingHorizontal: 8,
   },
   statValue: {
     fontSize: 24,
@@ -187,25 +189,32 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#6b7280',
+    fontSize: 10,
+    color: '#94a3b8',
     textTransform: 'uppercase',
+    textAlign: 'center',
+    numberOfLines: 1,
   },
   menuContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: '#1e293b',
     marginTop: 16,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#334155',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f3f4f6',
+    borderBottomColor: '#334155',
   },
   menuText: {
     flex: 1,
     fontSize: 16,
-    color: '#111827',
+    color: '#e2e8f0',
     marginLeft: 16,
   },
   logoutText: {

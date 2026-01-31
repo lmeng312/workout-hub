@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -151,6 +152,13 @@ export default function WorkoutSessionScreen() {
       {!isResting && currentExercise && (
         <View style={styles.currentExerciseCard}>
           <Text style={styles.currentLabel}>CURRENT EXERCISE</Text>
+          {currentExercise.image && (
+            <Image
+              source={{ uri: currentExercise.image }}
+              style={styles.currentExerciseImage}
+              resizeMode="cover"
+            />
+          )}
           <Text style={styles.currentName}>{currentExercise.name}</Text>
           {currentExercise.sets && currentExercise.sets[0] && (
             <View style={styles.currentDetails}>
@@ -206,6 +214,13 @@ export default function WorkoutSessionScreen() {
                     <Ionicons name="checkmark" size={16} color="#fff" />
                   )}
                 </View>
+                {exercise.image && (
+                  <Image
+                    source={{ uri: exercise.image }}
+                    style={styles.exerciseItemImage}
+                    resizeMode="cover"
+                  />
+                )}
                 <View style={styles.exerciseItemInfo}>
                   <Text style={[
                     styles.exerciseItemName,
@@ -344,6 +359,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     letterSpacing: 1,
   },
+  currentExerciseImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    marginBottom: 12,
+    backgroundColor: '#f3f4f6',
+  },
   currentName: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -408,6 +430,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     flex: 1,
+  },
+  exerciseItemImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
   },
   checkbox: {
     width: 24,

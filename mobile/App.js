@@ -30,10 +30,10 @@ function MainTabs() {
 
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Feed') {
-            iconName = focused ? 'people' : 'people-outline';
-          } else if (route.name === 'Library') {
-            iconName = focused ? 'library' : 'library-outline';
+          } else if (route.name === 'Workouts') {
+            iconName = focused ? 'barbell' : 'barbell-outline';
+          } else if (route.name === 'Discover') {
+            iconName = focused ? 'compass' : 'compass-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           }
@@ -41,20 +41,36 @@ function MainTabs() {
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#22c55e',
-        tabBarInactiveTintColor: '#9ca3af',
+        tabBarInactiveTintColor: '#64748b',
+        tabBarStyle: {
+          backgroundColor: '#1e293b',
+          borderTopColor: '#334155',
+          borderTopWidth: 1,
+          paddingBottom: 8,
+          paddingTop: 8,
+          height: 65,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '600',
+        },
         headerStyle: {
-          backgroundColor: '#22c55e',
+          backgroundColor: '#0f172a',
+          borderBottomWidth: 0,
+          elevation: 0,
+          shadowOpacity: 0,
         },
         headerTintColor: '#fff',
         headerTitleStyle: {
           fontWeight: 'bold',
         },
+        headerShown: false,
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Feed" component={FeedScreen} />
-      <Tab.Screen name="Library" component={LibraryScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Workouts" component={LibraryScreen} options={{ headerShown: true }} />
+      <Tab.Screen name="Discover" component={FeedScreen} options={{ headerShown: true }} />
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ headerShown: true }} />
     </Tab.Navigator>
   );
 }
@@ -127,7 +143,7 @@ export default function App() {
                 component={CreateWorkoutScreen}
                 options={{
                   headerShown: true,
-                  headerStyle: { backgroundColor: '#22c55e' },
+                  headerStyle: { backgroundColor: '#0f172a', borderBottomWidth: 0 },
                   headerTintColor: '#fff',
                   title: 'Create Workout'
                 }}
@@ -137,7 +153,7 @@ export default function App() {
                 component={WorkoutDetailScreen}
                 options={{
                   headerShown: true,
-                  headerStyle: { backgroundColor: '#22c55e' },
+                  headerStyle: { backgroundColor: '#0f172a', borderBottomWidth: 0 },
                   headerTintColor: '#fff',
                   title: 'Workout Details'
                 }}
@@ -147,7 +163,7 @@ export default function App() {
                 component={WorkoutPreviewScreen}
                 options={{
                   headerShown: true,
-                  headerStyle: { backgroundColor: '#22c55e' },
+                  headerStyle: { backgroundColor: '#0f172a', borderBottomWidth: 0 },
                   headerTintColor: '#fff',
                   title: 'Review Workout'
                 }}
@@ -157,7 +173,7 @@ export default function App() {
                 component={EditWorkoutScreen}
                 options={{
                   headerShown: true,
-                  headerStyle: { backgroundColor: '#22c55e' },
+                  headerStyle: { backgroundColor: '#0f172a', borderBottomWidth: 0 },
                   headerTintColor: '#fff',
                   title: 'Edit Workout'
                 }}
@@ -167,7 +183,7 @@ export default function App() {
                 component={WorkoutSessionScreen}
                 options={{
                   headerShown: true,
-                  headerStyle: { backgroundColor: '#22c55e' },
+                  headerStyle: { backgroundColor: '#0f172a', borderBottomWidth: 0 },
                   headerTintColor: '#fff',
                   title: 'Workout Session',
                   headerLeft: null,
