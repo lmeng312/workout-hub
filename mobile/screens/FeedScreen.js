@@ -8,6 +8,7 @@ import {
   RefreshControl,
   Image,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -21,17 +22,28 @@ export default function FeedScreen() {
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     loadFeed();
   }, []);
 
   const loadFeed = async () => {
+    setError(null);
     try {
       const response = await api.get('/social/feed');
       setActivities(response.data);
-    } catch (error) {
-      console.error('Error loading feed:', error);
+    } catch (err) {
+      console.error('Error loading feed:', err);
+      const isTimeout = err.code === 'ECONNABORTED' || err.message?.toLowerCase().includes('timeout');
+      const isNetworkError = err.message === 'Network Error' || err.code === 'ERR_NETWORK';
+      let message = err.response?.data?.message || err.message || 'Failed to load feed';
+      if (isTimeout) {
+        message = 'The request took too long. Check that your device and computer are on the same WiFi, and that the backend is running.';
+      } else if (isNetworkError) {
+        message = "Can't reach the server. Make sure the backend is running (npm start in /backend), and that your IP in mobile/config.js matches your computer's WiFi IP. Use localhost:3000 for iOS Simulator.";
+      }
+      setError(message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -218,17 +230,33 @@ export default function FeedScreen() {
         data={activities}
         renderItem={renderActivity}
         keyExtractor={(item) => item._id}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={[styles.list, activities.length === 0 && { flexGrow: 1 }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="people-outline" size={64} color="#9ca3af" />
-            <Text style={styles.emptyText}>No activity in your feed</Text>
-            <Text style={styles.emptySubtext}>
-              Complete workouts or follow friends to see activities here!
-            </Text>
+            {loading ? (
+              <ActivityIndicator size="large" color="#22c55e" />
+            ) : error ? (
+              <>
+                <Ionicons name="cloud-offline-outline" size={64} color="#9ca3af" />
+                <Text style={styles.emptyText}>Couldn't load feed</Text>
+                <Text style={styles.emptySubtext}>{error}</Text>
+                <TouchableOpacity style={styles.retryButton} onPress={loadFeed}>
+                  <Ionicons name="refresh" size={20} color="#fff" />
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Ionicons name="people-outline" size={64} color="#9ca3af" />
+                <Text style={styles.emptyText}>No activity in your feed</Text>
+                <Text style={styles.emptySubtext}>
+                  Complete workouts or follow friends to see activities here!
+                </Text>
+              </>
+            )}
           </View>
         }
       />
@@ -419,5 +447,20 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
     paddingHorizontal: 32,
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#22c55e',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

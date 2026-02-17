@@ -148,9 +148,9 @@ export default function CreateWorkoutScreen() {
         ]);
       } else {
         // Parse from YouTube or Instagram - show preview first
-        const url = mode === 'youtube' ? linkOrText : instagramUrl;
+        const url = (mode === 'youtube' ? linkOrText : instagramUrl).trim();
         const response = await api.post('/workouts/parse/preview', {
-          text: linkOrText,
+          text: linkOrText.trim(),
           sourceType: mode,
           url: url,
         });
@@ -168,7 +168,11 @@ export default function CreateWorkoutScreen() {
         }
       }
     } catch (error) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to create workout');
+      const isNetworkError = error.message === 'Network Error' || error.code === 'ERR_NETWORK';
+      const message = isNetworkError
+        ? "Can't reach the server. Ensure the backend is running and mobile/config.js has the correct API URL for your setup."
+        : (error.response?.data?.message || error.message || 'Failed to create workout');
+      Alert.alert('Error', message);
     } finally {
       setLoading(false);
     }

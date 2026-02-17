@@ -33,8 +33,8 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/fitcommun
 })
 .then(() => {
   console.log('✅ MongoDB connected successfully!');
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on port ${PORT} (accessible from network)`);
   });
 })
 .catch(err => {

@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../config';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 60000, // 60 seconds - slow networks / cold starts may need more time
 });
 
 // Holds a reference to the signOut function from AuthContext

@@ -696,17 +696,34 @@ async function fetchYouTubeMetadata(videoId) {
 }
 
 /**
+ * Extract YouTube video ID from various URL formats
+ * Supports: watch?v=, youtu.be/, shorts/, embed/
+ */
+function extractYouTubeVideoId(url) {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/shorts\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]{11})/,
+    /youtube\.com\/watch\?v=([^&\n?#]+)/,
+    /youtu\.be\/([^?\n#]+)/,
+  ];
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+    if (match) return match[1];
+  }
+  return null;
+}
+
+/**
  * Parse workout from YouTube URL
  */
 async function parseYouTubeWorkout(url, captionText = '') {
   try {
-    // Extract video ID from URL
-    const videoIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
-    if (!videoIdMatch) {
-      throw new Error('Invalid YouTube URL');
+    const trimmedUrl = typeof url === 'string' ? url.trim() : '';
+    const videoId = extractYouTubeVideoId(trimmedUrl);
+    if (!videoId) {
+      throw new Error('Invalid YouTube URL. Please use a YouTube video link (e.g. youtube.com/watch?v=..., youtu.be/..., or youtube.com/shorts/...)');
     }
-
-    const videoId = videoIdMatch[1];
     
     // Try to fetch metadata from YouTube API
     let metadata = null;
@@ -722,7 +739,8 @@ async function parseYouTubeWorkout(url, captionText = '') {
     
     if (!metadata) {
       try {
-        const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+        const canonicalUrl = `https://www.youtube.com/watch?v=${videoId}`;
+        const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(canonicalUrl)}&format=json`;
         const oembedResponse = await axios.get(oembedUrl);
         title = oembedResponse.data.title;
       } catch (error) {
@@ -740,7 +758,7 @@ async function parseYouTubeWorkout(url, captionText = '') {
     // Build source object with preview metadata
     workout.source = {
       type: 'youtube',
-      url: url,
+      url: trimmedUrl,
       originalText: combinedText,
       preview: {
         thumbnail: metadata?.thumbnail || `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`,
@@ -761,14 +779,14 @@ async function parseYouTubeWorkout(url, captionText = '') {
     return workout;
   } catch (error) {
     // Fallback: parse just the caption text
-    const videoIdMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&\n?#]+)/);
-    const videoId = videoIdMatch ? videoIdMatch[1] : '';
+    const trimmedUrl = typeof url === 'string' ? url.trim() : '';
+    const videoId = extractYouTubeVideoId(trimmedUrl) || '';
     
     const workout = parseWorkoutFromText(captionText, 'youtube');
     workout.title = workout.title || 'YouTube Workout';
     workout.source = {
       type: 'youtube',
-      url: url,
+      url: trimmedUrl,
       originalText: captionText,
       preview: {
         thumbnail: videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : '',
