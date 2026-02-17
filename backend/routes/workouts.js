@@ -6,6 +6,31 @@ const { enrichExercisesWithImages } = require('../utils/exerciseImageLookup');
 
 const router = express.Router();
 
+// Helper: add isSaved and likedBy metadata to workout objects
+function addWorkoutMetadata(workouts, userId) {
+  const userIdStr = userId.toString();
+  return workouts.map(workout => {
+    const w = workout.toObject ? workout.toObject() : workout;
+    return {
+      ...w,
+      isSaved: (w.savedBy || []).some(id => id.toString() === userIdStr),
+      likedBy: w.likedBy || [],
+    };
+  });
+}
+
+// Helper: find workout by id only if user has visibility (public, creator, or savedBy)
+async function findVisibleWorkout(workoutId, userId) {
+  return Workout.findOne({
+    _id: workoutId,
+    $or: [
+      { isPublic: true },
+      { creator: userId },
+      { savedBy: userId }
+    ]
+  });
+}
+
 // Get all workouts (public + user's own)
 router.get('/', auth, async (req, res) => {
   try {
@@ -18,19 +43,7 @@ router.get('/', auth, async (req, res) => {
     .populate('creator', 'username displayName profilePicture')
     .sort({ createdAt: -1 });
 
-    // Get user's favorites
-    const User = require('../models/User');
-    const user = await User.findById(req.user._id);
-    const favoriteIds = user.favorites.map(id => id.toString());
-
-    // Add isFavorited and likedBy field to each workout
-    const workoutsWithMetadata = workouts.map(workout => ({
-      ...workout.toObject(),
-      isFavorited: favoriteIds.includes(workout._id.toString()),
-      likedBy: workout.likedBy || [] // Ensure likedBy is included
-    }));
-
-    res.json(workoutsWithMetadata);
+    res.json(addWorkoutMetadata(workouts, req.user._id));
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -48,19 +61,19 @@ router.get('/library', auth, async (req, res) => {
     .populate('creator', 'username displayName profilePicture')
     .sort({ createdAt: -1 });
 
-    // Get user's favorites
-    const User = require('../models/User');
-    const user = await User.findById(req.user._id);
-    const favoriteIds = user.favorites.map(id => id.toString());
+    res.json(addWorkoutMetadata(workouts, req.user._id));
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
 
-    // Add isFavorited and likedBy field to each workout
-    const workoutsWithMetadata = workouts.map(workout => ({
-      ...workout.toObject(),
-      isFavorited: favoriteIds.includes(workout._id.toString()),
-      likedBy: workout.likedBy || [] // Ensure likedBy is included
-    }));
-
-    res.json(workoutsWithMetadata);
+// Get count of workouts completed by the current user (must be before GET /:id)
+router.get('/stats/completed', auth, async (req, res) => {
+  try {
+    const count = await Workout.countDocuments({
+      'completedBy.user': req.user._id,
+    });
+    res.json({ completedCount: count });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -82,15 +95,7 @@ router.get('/:id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Workout not found' });
     }
 
-    // Check if user has favorited this workout
-    const User = require('../models/User');
-    const user = await User.findById(req.user._id);
-    const isFavorited = user.favorites.some(favId => favId.toString() === workout._id.toString());
-
-    res.json({
-      ...workout.toObject(),
-      isFavorited
-    });
+    res.json(addWorkoutMetadata([workout], req.user._id)[0]);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -242,7 +247,7 @@ router.delete('/:id', auth, async (req, res) => {
 // Mark workout as completed
 router.post('/:id/complete', auth, async (req, res) => {
   try {
-    const workout = await Workout.findById(req.params.id);
+    const workout = await findVisibleWorkout(req.params.id, req.user._id);
     if (!workout) {
       return res.status(404).json({ message: 'Workout not found' });
     }
@@ -268,7 +273,7 @@ router.post('/:id/complete', auth, async (req, res) => {
 // Save workout to library
 router.post('/:id/save', auth, async (req, res) => {
   try {
-    const workout = await Workout.findById(req.params.id);
+    const workout = await findVisibleWorkout(req.params.id, req.user._id);
     if (!workout) {
       return res.status(404).json({ message: 'Workout not found' });
     }
@@ -287,7 +292,7 @@ router.post('/:id/save', auth, async (req, res) => {
 // Unsave workout
 router.post('/:id/unsave', auth, async (req, res) => {
   try {
-    const workout = await Workout.findById(req.params.id);
+    const workout = await findVisibleWorkout(req.params.id, req.user._id);
     if (!workout) {
       return res.status(404).json({ message: 'Workout not found' });
     }
@@ -298,63 +303,6 @@ router.post('/:id/unsave', auth, async (req, res) => {
     await workout.save();
 
     res.json(workout);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Favorite workout
-router.post('/:id/favorite', auth, async (req, res) => {
-  try {
-    const workout = await Workout.findById(req.params.id);
-    if (!workout) {
-      return res.status(404).json({ message: 'Workout not found' });
-    }
-
-    const User = require('../models/User');
-    const user = await User.findById(req.user._id);
-    
-    if (!user.favorites.includes(req.params.id)) {
-      user.favorites.push(req.params.id);
-      await user.save();
-    }
-
-    res.json({ message: 'Workout favorited', isFavorited: true });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Unfavorite workout
-router.post('/:id/unfavorite', auth, async (req, res) => {
-  try {
-    const User = require('../models/User');
-    const user = await User.findById(req.user._id);
-    
-    user.favorites = user.favorites.filter(
-      workoutId => workoutId.toString() !== req.params.id
-    );
-    await user.save();
-
-    res.json({ message: 'Workout unfavorited', isFavorited: false });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// Get user's favorite workouts
-router.get('/favorites/list', auth, async (req, res) => {
-  try {
-    const User = require('../models/User');
-    const user = await User.findById(req.user._id).populate({
-      path: 'favorites',
-      populate: {
-        path: 'creator',
-        select: 'username displayName profilePicture'
-      }
-    });
-
-    res.json(user.favorites || []);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -391,7 +339,7 @@ router.post('/:id/refresh-images', auth, async (req, res) => {
 // Like workout
 router.post('/:id/like', auth, async (req, res) => {
   try {
-    const workout = await Workout.findById(req.params.id);
+    const workout = await findVisibleWorkout(req.params.id, req.user._id);
     if (!workout) {
       return res.status(404).json({ message: 'Workout not found' });
     }
@@ -410,7 +358,7 @@ router.post('/:id/like', auth, async (req, res) => {
 // Unlike workout
 router.post('/:id/unlike', auth, async (req, res) => {
   try {
-    const workout = await Workout.findById(req.params.id);
+    const workout = await findVisibleWorkout(req.params.id, req.user._id);
     if (!workout) {
       return res.status(404).json({ message: 'Workout not found' });
     }
@@ -429,7 +377,7 @@ router.post('/:id/unlike', auth, async (req, res) => {
 // Duplicate workout
 router.post('/:id/duplicate', auth, async (req, res) => {
   try {
-    const originalWorkout = await Workout.findById(req.params.id);
+    const originalWorkout = await findVisibleWorkout(req.params.id, req.user._id);
     if (!originalWorkout) {
       return res.status(404).json({ message: 'Workout not found' });
     }
@@ -454,9 +402,10 @@ router.post('/:id/duplicate', auth, async (req, res) => {
     await duplicatedWorkout.save();
     await duplicatedWorkout.populate('creator', 'username displayName profilePicture');
 
+    const workoutWithMetadata = addWorkoutMetadata([duplicatedWorkout], req.user._id)[0];
     res.status(201).json({
       message: 'Workout duplicated successfully',
-      workout: duplicatedWorkout
+      workout: workoutWithMetadata
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

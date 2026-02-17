@@ -10,9 +10,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { AuthContext } from '../context/AuthContext';
 import api from '../services/api';
+import Logo from '../components/Logo';
+import { PRIMARY_GREEN } from '../theme';
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -53,7 +54,7 @@ export default function HomeScreen() {
       onPress={() => navigation.navigate('WorkoutDetail', { workoutId: item._id })}
     >
       <View style={styles.exerciseIconContainer}>
-        <Ionicons name="fitness" size={24} color="#8b5cf6" />
+        <Ionicons name="fitness" size={24} color={PRIMARY_GREEN} />
       </View>
       <Text style={styles.exerciseName} numberOfLines={1}>{item.title}</Text>
       <View style={styles.exerciseTags}>
@@ -69,16 +70,19 @@ export default function HomeScreen() {
   const renderActivityItem = ({ item }) => {
     const creator = item.user;
     const workout = item.workout;
+    const isCompleted = item.type === 'completed';
     
     return (
       <View style={styles.activityItem}>
-        <View style={styles.activityAvatar}>
-          <Ionicons name="person" size={16} color="#fff" />
+        <View style={[styles.activityAvatar, isCompleted && styles.activityAvatarCompleted]}>
+          <Ionicons name={isCompleted ? 'checkmark' : 'person'} size={16} color="#fff" />
         </View>
         <View style={styles.activityContent}>
           <Text style={styles.activityText}>
             <Text style={styles.activityUser}>{creator?.displayName || creator?.username}</Text>
-            {' '}shared a new workout: "{workout?.title}"
+            {isCompleted
+              ? ` completed a workout: "${workout?.title}"`
+              : ` created a new workout: "${workout?.title}"`}
           </Text>
           <Text style={styles.activityTime}>
             {getTimeAgo(item.timestamp)}
@@ -102,161 +106,200 @@ export default function HomeScreen() {
   };
 
   return (
-    <ScrollView 
-      style={styles.container}
-      refreshControl={
-        <RefreshControl 
-          refreshing={refreshing} 
-          onRefresh={onRefresh}
-          tintColor="#8b5cf6"
-        />
-      }
-    >
-      {/* Header */}
+    <View style={styles.container}>
+      {/* White header: logo + FitCommunity + bell with badge */}
       <View style={styles.header}>
-        <View style={styles.logoContainer}>
-          <Ionicons name="fitness" size={24} color="#8b5cf6" />
-          <Text style={styles.logoText}>FitCommunity</Text>
+        <View style={styles.headerLeft}>
+          <Logo size="small" />
+          <Text style={styles.headerTitle}>
+            <Text style={styles.headerTitleFit}>Fit</Text>
+            <Text style={styles.headerTitleCommunity}>Community</Text>
+          </Text>
         </View>
+        <TouchableOpacity style={styles.bellButton}>
+          <Ionicons name="notifications-outline" size={24} color="#111827" />
+          <View style={styles.badge} />
+        </TouchableOpacity>
       </View>
 
-      {/* Welcome Section */}
-      <View style={styles.welcomeSection}>
-        <Text style={styles.welcomeTitle}>Welcome back!</Text>
-        <Text style={styles.welcomeSubtitle}>Ready for your next workout?</Text>
-      </View>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={PRIMARY_GREEN} />
+        }
+      >
+        <View style={styles.contentCard}>
+          <Text style={styles.welcomeTitle}>Welcome back!</Text>
+          <Text style={styles.cardSubtitle}>Ready for your next workout?</Text>
 
-      {/* Quick Actions */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('CreateWorkout')}
-          >
-            <View style={[styles.actionIcon, styles.greenAction]}>
-              <Ionicons name="add" size={28} color="#fff" />
-            </View>
-            <Text style={styles.actionLabel}>New Workout</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('Library')}
-          >
-            <View style={[styles.actionIcon, styles.purpleAction]}>
-              <Ionicons name="checkmark-circle" size={28} color="#fff" />
-            </View>
-            <Text style={styles.actionLabel}>Log Workout</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('CreateWorkout')}
-          >
-            <View style={[styles.actionIcon, styles.blueAction]}>
-              <Ionicons name="download" size={28} color="#fff" />
-            </View>
-            <Text style={styles.actionLabel}>Import</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Exercise Library */}
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Exercise Library</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Library')}>
-            <Text style={styles.seeAllText}>See All</Text>
-          </TouchableOpacity>
-        </View>
-        {libraryWorkouts.length > 0 ? (
-          <FlatList
-            horizontal
-            data={libraryWorkouts}
-            renderItem={renderExerciseCard}
-            keyExtractor={(item) => item._id}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.exerciseList}
-          />
-        ) : (
-          <View style={styles.emptyLibrary}>
-            <Text style={styles.emptyText}>No workouts in your library yet</Text>
-            <TouchableOpacity 
-              style={styles.createButton}
-              onPress={() => navigation.navigate('CreateWorkout')}
-            >
-              <Text style={styles.createButtonText}>Create Your First Workout</Text>
+          <View style={styles.quickActions}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('Library')}>
+              <Ionicons name="barbell" size={24} color={PRIMARY_GREEN} />
+              <Text style={styles.actionLabel} numberOfLines={2}>Start Workout</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('CreateWorkout')}>
+              <Ionicons name="add" size={24} color={PRIMARY_GREEN} />
+              <Text style={styles.actionLabel} numberOfLines={1}>New</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton} onPress={() => navigation.navigate('CreateWorkout')}>
+              <Ionicons name="download" size={24} color={PRIMARY_GREEN} />
+              <Text style={styles.actionLabel} numberOfLines={1}>Import</Text>
             </TouchableOpacity>
           </View>
-        )}
-      </View>
 
-      {/* Activity Feed */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Activity Feed</Text>
-        {recentActivities.length > 0 ? (
-          <View style={styles.activityFeed}>
-            {recentActivities.map((item) => (
-              <View key={item._id}>
-                {renderActivityItem({ item })}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Exercise Library</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Library')}>
+                <Text style={styles.seeAllText}>See All</Text>
+              </TouchableOpacity>
+            </View>
+            {libraryWorkouts.length > 0 ? (
+              <FlatList
+                horizontal
+                data={libraryWorkouts}
+                renderItem={renderExerciseCard}
+                keyExtractor={(item) => item._id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.exerciseList}
+              />
+            ) : (
+              <View style={styles.emptyLibrary}>
+                <Text style={styles.emptyText}>No workouts in your library yet</Text>
+                <TouchableOpacity style={styles.createButton} onPress={() => navigation.navigate('CreateWorkout')}>
+                  <Text style={styles.createButtonText}>Create Your First Workout</Text>
+                </TouchableOpacity>
               </View>
-            ))}
-            <TouchableOpacity 
-              style={styles.viewAllButton}
-              onPress={() => navigation.navigate('Feed')}
-            >
-              <Text style={styles.viewAllText}>View All Activity</Text>
-              <Ionicons name="chevron-forward" size={16} color="#8b5cf6" />
-            </TouchableOpacity>
+            )}
           </View>
-        ) : (
-          <View style={styles.emptyActivity}>
-            <Ionicons name="people-outline" size={48} color="#4b5563" />
-            <Text style={styles.emptyText}>No recent activity</Text>
+
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Activity Feed</Text>
+            {recentActivities.length > 0 ? (
+              <View style={styles.activityFeed}>
+                {recentActivities.map((item) => (
+                  <View key={item._id}>{renderActivityItem({ item })}</View>
+                ))}
+                <TouchableOpacity style={styles.viewAllButton} onPress={() => navigation.navigate('Discover')}>
+                  <Text style={styles.viewAllText}>View All Activity</Text>
+                  <Ionicons name="chevron-forward" size={16} color={PRIMARY_GREEN} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.emptyActivity}>
+                <Ionicons name="people-outline" size={48} color="#9ca3af" />
+                <Text style={styles.emptyText}>No recent activity</Text>
+              </View>
+            )}
           </View>
-        )}
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#f3f4f6',
   },
   header: {
-    padding: 20,
-    paddingTop: 60,
-  },
-  logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    backgroundColor: '#ffffff',
+    paddingTop: 56,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
   },
-  logoText: {
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
   },
-  welcomeSection: {
-    paddingHorizontal: 20,
-    paddingVertical: 24,
+  headerTitleFit: {
+    color: '#111827',
+    fontWeight: '500',
+  },
+  headerTitleCommunity: {
+    color: '#111827',
+    fontWeight: '700',
+  },
+  bellButton: {
+    padding: 8,
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ef4444',
+  },
+  scroll: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  contentCard: {
+    backgroundColor: '#ffffff',
+    margin: 16,
+    marginTop: 16,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   welcomeTitle: {
-    fontSize: 32,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
+    color: '#111827',
+    marginBottom: 4,
   },
-  welcomeSubtitle: {
+  cardSubtitle: {
     fontSize: 16,
-    color: '#94a3b8',
+    color: '#6b7280',
+    marginBottom: 20,
+  },
+  quickActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 32,
+  },
+  actionButton: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 72,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  actionLabel: {
+    fontSize: 12,
+    color: PRIMARY_GREEN,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
   section: {
-    paddingHorizontal: 20,
-    marginBottom: 32,
+    marginBottom: 28,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -267,68 +310,31 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#111827',
     marginBottom: 16,
   },
   seeAllText: {
     fontSize: 14,
-    color: '#22c55e',
+    color: PRIMARY_GREEN,
     fontWeight: '600',
-  },
-  quickActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 16,
-  },
-  actionButton: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 12,
-  },
-  actionIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  greenAction: {
-    backgroundColor: '#22c55e',
-  },
-  purpleAction: {
-    backgroundColor: '#8b5cf6',
-  },
-  blueAction: {
-    backgroundColor: '#3b82f6',
-  },
-  actionLabel: {
-    fontSize: 14,
-    color: '#e2e8f0',
-    fontWeight: '600',
-    textAlign: 'center',
   },
   exerciseList: {
     paddingRight: 20,
   },
   exerciseCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f9fafb',
     borderRadius: 16,
     padding: 16,
     marginRight: 12,
     width: 160,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#e5e7eb',
   },
   exerciseIconContainer: {
     width: 48,
     height: 48,
     borderRadius: 12,
-    backgroundColor: '#2d1b4e',
+    backgroundColor: '#dcfce7',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -336,7 +342,7 @@ const styles = StyleSheet.create({
   exerciseName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#111827',
     marginBottom: 8,
   },
   exerciseTags: {
@@ -350,39 +356,41 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   intermediateTag: {
-    backgroundColor: '#451a03',
+    backgroundColor: '#fef3c7',
   },
   exerciseTagText: {
     fontSize: 11,
-    color: '#f59e0b',
+    color: '#d97706',
     fontWeight: '600',
     textTransform: 'capitalize',
   },
   emptyLibrary: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f9fafb',
     borderRadius: 16,
     padding: 32,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#e5e7eb',
     borderStyle: 'dashed',
   },
   emptyText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#6b7280',
     marginBottom: 16,
     textAlign: 'center',
   },
   createButton: {
-    backgroundColor: '#8b5cf6',
+    backgroundColor: PRIMARY_GREEN,
     paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 12,
+    alignSelf: 'center',
   },
   createButtonText: {
     fontSize: 14,
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
   activityFeed: {
     gap: 16,
@@ -390,19 +398,22 @@ const styles = StyleSheet.create({
   activityItem: {
     flexDirection: 'row',
     gap: 12,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f9fafb',
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#e5e7eb',
   },
   activityAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#8b5cf6',
+    backgroundColor: '#3b82f6',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  activityAvatarCompleted: {
+    backgroundColor: PRIMARY_GREEN,
   },
   activityContent: {
     flex: 1,
@@ -410,16 +421,16 @@ const styles = StyleSheet.create({
   },
   activityText: {
     fontSize: 14,
-    color: '#e2e8f0',
+    color: '#374151',
     lineHeight: 20,
   },
   activityUser: {
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#111827',
   },
   activityTime: {
     fontSize: 12,
-    color: '#64748b',
+    color: '#9ca3af',
   },
   viewAllButton: {
     flexDirection: 'row',
@@ -430,15 +441,15 @@ const styles = StyleSheet.create({
   },
   viewAllText: {
     fontSize: 14,
-    color: '#8b5cf6',
+    color: PRIMARY_GREEN,
     fontWeight: '600',
   },
   emptyActivity: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f9fafb',
     borderRadius: 16,
     padding: 48,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#e5e7eb',
   },
 });

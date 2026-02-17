@@ -13,6 +13,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
 import api from '../services/api';
 import SourcePreview from '../components/SourcePreview';
+import Logo from '../components/Logo';
 
 export default function LibraryScreen() {
   const navigation = useNavigation();
@@ -47,10 +48,7 @@ export default function LibraryScreen() {
   const renderWorkout = ({ item }) => {
     const currentUserId = user?.id;
     const isOwned = item.creator?._id?.toString() === currentUserId;
-    const isSaved = !isOwned && item.savedBy && item.savedBy.some(
-      userId => userId.toString() === currentUserId
-    );
-    const isFavorited = item.isFavorited || false;
+    const isSaved = !isOwned && (item.isSaved || false);
     const hasThumbnail = item.source?.preview?.thumbnail;
 
     return (
@@ -64,15 +62,9 @@ export default function LibraryScreen() {
               <View style={styles.workoutTitleContainer}>
                 <Text style={styles.workoutTitle}>{item.title}</Text>
                 <View style={styles.badgesRow}>
-                  {isFavorited && (
-                    <View style={styles.favoritedBadge}>
-                      <Ionicons name="heart" size={12} color="#ef4444" />
-                      <Text style={styles.favoritedText}>Favorited</Text>
-                    </View>
-                  )}
-                  {isSaved && !isOwned && (
+                  {isSaved && (
                     <View style={styles.savedBadge}>
-                      <Ionicons name="bookmark" size={12} color="#22c55e" />
+                      <Ionicons name="heart" size={12} color="#ef4444" />
                       <Text style={styles.savedText}>Saved</Text>
                     </View>
                   )}
@@ -136,7 +128,10 @@ export default function LibraryScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Library</Text>
+        <View style={styles.headerLeft}>
+          <Logo size="small" />
+          <Text style={styles.headerTitle}>My Library</Text>
+        </View>
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => navigation.navigate('CreateWorkout')}
@@ -168,7 +163,7 @@ export default function LibraryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#f9fafb',
   },
   header: {
     flexDirection: 'row',
@@ -176,14 +171,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     paddingTop: 60,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: '#e5e7eb',
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#111827',
   },
   addButton: {
     padding: 4,
@@ -192,12 +192,12 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   workoutCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#e5e7eb',
   },
   contentRow: {
     flexDirection: 'row',
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   workoutTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#111827',
   },
   badgesRow: {
     flexDirection: 'row',
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
   savedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#166534',
+    backgroundColor: '#dcfce7',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
@@ -239,26 +239,12 @@ const styles = StyleSheet.create({
   },
   savedText: {
     fontSize: 10,
-    color: '#dcfce7',
-    fontWeight: '600',
-  },
-  favoritedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#7f1d1d',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-    gap: 4,
-  },
-  favoritedText: {
-    fontSize: 10,
-    color: '#fee2e2',
+    color: '#166534',
     fontWeight: '600',
   },
   workoutDescription: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#6b7280',
     marginBottom: 12,
   },
   workoutMeta: {
@@ -272,7 +258,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#6b7280',
   },
   likedText: {
     color: '#ef4444',
@@ -284,9 +270,9 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#f3f4f6',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#e5e7eb',
   },
   thumbnail: {
     width: '100%',
@@ -314,12 +300,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: '#6b7280',
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#9ca3af',
     marginTop: 8,
   },
 });

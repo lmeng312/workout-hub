@@ -46,10 +46,18 @@ const userSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
   }],
-  favorites: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Workout'
+  refreshTokens: [{
+    token: { type: String, required: true },
+    createdAt: { type: Date, default: Date.now, expires: '90d' }
   }],
+  emailVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerifyToken: { type: String },
+  emailVerifyExpires: { type: Date },
+  passwordResetToken: { type: String },
+  passwordResetExpires: { type: Date },
   createdAt: {
     type: Date,
     default: Date.now

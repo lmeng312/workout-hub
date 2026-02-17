@@ -28,7 +28,21 @@ export default function EditWorkoutScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const response = await api.put(`/workouts/${workout._id}`, workout);
+      // Convert string values back to numbers before saving
+      const payload = {
+        ...workout,
+        exercises: workout.exercises.map((ex) => ({
+          ...ex,
+          sets: ex.sets.map((set) => ({
+            ...set,
+            reps: parseFloat(set.reps) || 0,
+            weight: parseFloat(set.weight) || 0,
+            duration: parseFloat(set.duration) || 0,
+            rest: parseFloat(set.rest) || 60,
+          })),
+        })),
+      };
+      const response = await api.put(`/workouts/${workout._id}`, payload);
       
       Alert.alert('Success', 'Workout updated successfully!', [
         { text: 'OK', onPress: () => navigation.goBack() }
@@ -96,7 +110,7 @@ export default function EditWorkoutScreen() {
 
   const updateSet = (exerciseIndex, setIndex, field, value) => {
     const updatedExercises = [...workout.exercises];
-    updatedExercises[exerciseIndex].sets[setIndex][field] = parseFloat(value) || 0;
+    updatedExercises[exerciseIndex].sets[setIndex][field] = value;
     setWorkout({ ...workout, exercises: updatedExercises });
   };
 
@@ -168,48 +182,61 @@ export default function EditWorkoutScreen() {
                 />
 
                 <Text style={styles.setsLabel}>Sets</Text>
-                {exercise.sets && exercise.sets.map((set, setIndex) => (
-                  <View key={setIndex} style={styles.setRowExpanded}>
-                    <Text style={styles.setNumber}>Set {setIndex + 1}</Text>
-                    <View style={styles.setInputs}>
-                      <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Reps</Text>
+                <View style={styles.setsTable}>
+                  <View style={styles.setsHeaderRow}>
+                    <View style={styles.setsHeaderLabel} />
+                    <View style={styles.setInputsRow}>
+                      <Text style={styles.setsHeaderCell}>Reps</Text>
+                      <Text style={styles.setsHeaderCell}>Wt (lbs)</Text>
+                      <Text style={styles.setsHeaderCell}>Time (s)</Text>
+                    </View>
+                    <View style={styles.setsHeaderSpacer} />
+                  </View>
+                  {exercise.sets && exercise.sets.map((set, setIndex) => {
+                    const prev = setIndex > 0 ? exercise.sets[setIndex - 1] : null;
+                    return (
+                      <View key={setIndex} style={styles.setRow}>
+                      <Text style={styles.setNumber}>Set {setIndex + 1}</Text>
+                      <View style={styles.setInputsRow}>
                         <TextInput
                           style={styles.smallInput}
+                          placeholder={prev ? String(prev.reps ?? 10) : '10'}
+                          placeholderTextColor="#9ca3af"
                           keyboardType="numeric"
-                          value={set.reps?.toString() || '0'}
+                          value={set.reps === '' || set.reps === undefined ? '' : String(set.reps)}
                           onChangeText={(text) => updateSet(exIndex, setIndex, 'reps', text)}
                         />
-                      </View>
-                      <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Weight (lbs)</Text>
                         <TextInput
                           style={styles.smallInput}
+                          placeholder={prev ? String(prev.weight ?? 0) : '0'}
+                          placeholderTextColor="#9ca3af"
                           keyboardType="numeric"
-                          value={set.weight?.toString() || '0'}
+                          value={set.weight === '' || set.weight === undefined ? '' : String(set.weight)}
                           onChangeText={(text) => updateSet(exIndex, setIndex, 'weight', text)}
                         />
-                      </View>
-                      <View style={styles.inputGroup}>
-                        <Text style={styles.inputLabel}>Duration (s)</Text>
                         <TextInput
                           style={styles.smallInput}
+                          placeholder={prev ? String(prev.duration ?? 0) : '0'}
+                          placeholderTextColor="#9ca3af"
                           keyboardType="numeric"
-                          value={set.duration?.toString() || '0'}
+                          value={set.duration === '' || set.duration === undefined ? '' : String(set.duration)}
                           onChangeText={(text) => updateSet(exIndex, setIndex, 'duration', text)}
                         />
                       </View>
-                    </View>
-                    {exercise.sets.length > 1 && (
-                      <TouchableOpacity
-                        onPress={() => removeSet(exIndex, setIndex)}
-                        style={styles.removeSetButton}
-                      >
-                        <Ionicons name="close-circle" size={20} color="#ef4444" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ))}
+                      {exercise.sets.length > 1 ? (
+                        <TouchableOpacity
+                          onPress={() => removeSet(exIndex, setIndex)}
+                          style={styles.removeSetButton}
+                        >
+                          <Ionicons name="close-circle" size={20} color="#ef4444" />
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={styles.removeSetPlaceholder} />
+                      )}
+                      </View>
+                    );
+                  })}
+                </View>
 
                 <TouchableOpacity
                   style={styles.addSetButton}
@@ -375,48 +402,65 @@ const styles = StyleSheet.create({
     color: '#111827',
     marginBottom: 8,
   },
-  setRowExpanded: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    marginBottom: 12,
+  setsTable: {
     backgroundColor: '#f9fafb',
-    padding: 12,
     borderRadius: 8,
+    padding: 10,
+  },
+  setsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  setsHeaderLabel: {
+    width: 40,
+  },
+  setsHeaderCell: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  setsHeaderSpacer: {
+    width: 24,
+  },
+  setRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
   },
   setNumber: {
+    width: 40,
     fontSize: 12,
     fontWeight: '600',
     color: '#6b7280',
-    width: 45,
-    paddingTop: 20,
-  },
-  setInputs: {
-    flexDirection: 'row',
-    flex: 1,
-    gap: 8,
-  },
-  inputGroup: {
-    flex: 1,
-    alignItems: 'stretch',
-  },
-  inputLabel: {
-    fontSize: 10,
-    color: '#6b7280',
-    marginBottom: 4,
     textAlign: 'center',
   },
+  setInputsRow: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 6,
+  },
   smallInput: {
+    flex: 1,
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
     fontSize: 14,
     borderWidth: 1,
     borderColor: '#e5e7eb',
     textAlign: 'center',
   },
   removeSetButton: {
-    padding: 4,
+    width: 24,
+    alignItems: 'center',
+  },
+  removeSetPlaceholder: {
+    width: 24,
   },
   addSetButton: {
     flexDirection: 'row',

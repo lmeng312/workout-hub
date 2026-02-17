@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -15,36 +16,50 @@ import EditWorkoutScreen from './screens/EditWorkoutScreen';
 import WorkoutSessionScreen from './screens/WorkoutSessionScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import FeedScreen from './screens/FeedScreen';
+import Logo from './components/Logo';
 import { AuthContext } from './context/AuthContext';
 import { API_BASE_URL } from './config';
+import { setSignOutHandler } from './services/api';
+import { PRIMARY_GREEN } from './theme';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
+
+function CreatePlaceholder() {
+  return <View style={{ flex: 1 }} />;
+}
 
 function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
-
-          if (route.name === 'Home') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Workouts') {
-            iconName = focused ? 'barbell' : 'barbell-outline';
-          } else if (route.name === 'Discover') {
-            iconName = focused ? 'compass' : 'compass-outline';
-          } else if (route.name === 'Profile') {
-            iconName = focused ? 'person' : 'person-outline';
+          if (route.name === 'Create') {
+            return (
+              <View style={{
+                width: 28,
+                height: 28,
+                borderRadius: 14,
+                backgroundColor: PRIMARY_GREEN,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Ionicons name="add" size={size} color="#fff" />
+              </View>
+            );
           }
-
+          let iconName;
+          if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
+          else if (route.name === 'Library') iconName = focused ? 'library' : 'library-outline';
+          else if (route.name === 'Discover') iconName = focused ? 'compass' : 'compass-outline';
+          else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#22c55e',
-        tabBarInactiveTintColor: '#64748b',
+        tabBarActiveTintColor: PRIMARY_GREEN,
+        tabBarInactiveTintColor: '#6b7280',
         tabBarStyle: {
-          backgroundColor: '#1e293b',
-          borderTopColor: '#334155',
+          backgroundColor: '#ffffff',
+          borderTopColor: '#e5e7eb',
           borderTopWidth: 1,
           paddingBottom: 8,
           paddingTop: 8,
@@ -55,12 +70,12 @@ function MainTabs() {
           fontWeight: '600',
         },
         headerStyle: {
-          backgroundColor: '#0f172a',
+          backgroundColor: '#ffffff',
           borderBottomWidth: 0,
           elevation: 0,
           shadowOpacity: 0,
         },
-        headerTintColor: '#fff',
+        headerTintColor: '#111827',
         headerTitleStyle: {
           fontWeight: 'bold',
         },
@@ -68,9 +83,19 @@ function MainTabs() {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Workouts" component={LibraryScreen} options={{ headerShown: true }} />
-      <Tab.Screen name="Discover" component={FeedScreen} options={{ headerShown: true }} />
-      <Tab.Screen name="Profile" component={ProfileScreen} options={{ headerShown: true }} />
+      <Tab.Screen name="Discover" component={FeedScreen} />
+      <Tab.Screen
+        name="Create"
+        component={CreatePlaceholder}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            navigation.navigate('CreateWorkout');
+          },
+        })}
+      />
+      <Tab.Screen name="Library" component={LibraryScreen} />
+      <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
 }
@@ -87,11 +112,43 @@ export default function App() {
   const loadToken = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
+      const refreshToken = await AsyncStorage.getItem('refreshToken');
       const userData = await AsyncStorage.getItem('userData');
       
       if (token && userData) {
-        setUserToken(token);
-        setUser(JSON.parse(userData));
+        // Validate access token against the server
+        try {
+          const response = await fetch(`${API_BASE_URL}/auth/me`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (response.ok) {
+            setUserToken(token);
+            setUser(JSON.parse(userData));
+          } else if (refreshToken) {
+            // Access token expired — try refreshing
+            const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ refreshToken }),
+            });
+            if (refreshResponse.ok) {
+              const data = await refreshResponse.json();
+              await AsyncStorage.setItem('userToken', data.token);
+              await AsyncStorage.setItem('refreshToken', data.refreshToken);
+              setUserToken(data.token);
+              setUser(JSON.parse(userData));
+            } else {
+              // Refresh token also invalid — clear everything
+              await AsyncStorage.multiRemove(['userToken', 'refreshToken', 'userData']);
+            }
+          } else {
+            await AsyncStorage.multiRemove(['userToken', 'refreshToken', 'userData']);
+          }
+        } catch {
+          // Network error — allow offline use with cached token
+          setUserToken(token);
+          setUser(JSON.parse(userData));
+        }
       }
     } catch (error) {
       console.error('Error loading token:', error);
@@ -100,33 +157,59 @@ export default function App() {
     }
   };
 
+  const signIn = async (token, refreshToken, userData) => {
+    try {
+      await AsyncStorage.setItem('userToken', token);
+      await AsyncStorage.setItem('refreshToken', refreshToken);
+      await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      setUserToken(token);
+      setUser(userData);
+    } catch (error) {
+      console.error('Error signing in:', error);
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      // Revoke refresh token on the server
+      const refreshToken = await AsyncStorage.getItem('refreshToken');
+      if (refreshToken) {
+        try {
+          const token = await AsyncStorage.getItem('userToken');
+          await fetch(`${API_BASE_URL}/auth/logout`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ refreshToken }),
+          });
+        } catch {
+          // Server unreachable — still clear local state
+        }
+      }
+      await AsyncStorage.multiRemove(['userToken', 'refreshToken', 'userData']);
+      setUserToken(null);
+      setUser(null);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   const authContext = {
-    signIn: async (token, userData) => {
-      try {
-        await AsyncStorage.setItem('userToken', token);
-        await AsyncStorage.setItem('userData', JSON.stringify(userData));
-        setUserToken(token);
-        setUser(userData);
-      } catch (error) {
-        console.error('Error signing in:', error);
-      }
-    },
-    signOut: async () => {
-      try {
-        await AsyncStorage.removeItem('userToken');
-        await AsyncStorage.removeItem('userData');
-        setUserToken(null);
-        setUser(null);
-      } catch (error) {
-        console.error('Error signing out:', error);
-      }
-    },
+    signIn,
+    signOut,
     user,
     token: userToken,
   };
 
+  // Register signOut so the API interceptor can auto-logout on 401
+  useEffect(() => {
+    setSignOutHandler(signOut);
+  }, []);
+
   if (isLoading) {
-    return null; // You can add a loading screen here
+    return null;
   }
 
   return (
@@ -143,8 +226,8 @@ export default function App() {
                 component={CreateWorkoutScreen}
                 options={{
                   headerShown: true,
-                  headerStyle: { backgroundColor: '#0f172a', borderBottomWidth: 0 },
-                  headerTintColor: '#fff',
+                  headerStyle: { backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb', shadowOpacity: 0, elevation: 0 },
+                  headerTintColor: '#111827',
                   title: 'Create Workout'
                 }}
               />
@@ -153,9 +236,10 @@ export default function App() {
                 component={WorkoutDetailScreen}
                 options={{
                   headerShown: true,
-                  headerStyle: { backgroundColor: '#0f172a', borderBottomWidth: 0 },
-                  headerTintColor: '#fff',
-                  title: 'Workout Details'
+                  headerStyle: { backgroundColor: '#f9fafb', borderBottomWidth: 1, borderBottomColor: '#e5e7eb', shadowOpacity: 0, elevation: 0 },
+                  headerTintColor: '#111827',
+                  title: '',
+                  headerRight: () => <Logo size="small" style={{ marginRight: 16 }} />,
                 }}
               />
               <Stack.Screen 
@@ -163,8 +247,8 @@ export default function App() {
                 component={WorkoutPreviewScreen}
                 options={{
                   headerShown: true,
-                  headerStyle: { backgroundColor: '#0f172a', borderBottomWidth: 0 },
-                  headerTintColor: '#fff',
+                  headerStyle: { backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb', shadowOpacity: 0, elevation: 0 },
+                  headerTintColor: '#111827',
                   title: 'Review Workout'
                 }}
               />
@@ -173,8 +257,8 @@ export default function App() {
                 component={EditWorkoutScreen}
                 options={{
                   headerShown: true,
-                  headerStyle: { backgroundColor: '#0f172a', borderBottomWidth: 0 },
-                  headerTintColor: '#fff',
+                  headerStyle: { backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb', shadowOpacity: 0, elevation: 0 },
+                  headerTintColor: '#111827',
                   title: 'Edit Workout'
                 }}
               />
@@ -183,8 +267,8 @@ export default function App() {
                 component={WorkoutSessionScreen}
                 options={{
                   headerShown: true,
-                  headerStyle: { backgroundColor: '#0f172a', borderBottomWidth: 0 },
-                  headerTintColor: '#fff',
+                  headerStyle: { backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb', shadowOpacity: 0, elevation: 0 },
+                  headerTintColor: '#111827',
                   title: 'Workout Session',
                   headerLeft: null,
                 }}

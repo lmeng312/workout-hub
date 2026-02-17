@@ -143,23 +143,21 @@ router.get('/feed', auth, async (req, res) => {
     
     console.log(`🎯 Total activities: ${createdActivities.length + completedActivities.length} (${createdActivities.length} created + ${completedActivities.length} completed)`);
 
-    // Get user's favorites
-    const favoriteIds = user.favorites.map(id => id.toString());
-
-    // Add isFavorited and likedBy field to all activities
-    const activitiesWithFavorites = [...createdActivities, ...completedActivities]
+    // Add isSaved and likedBy field to all activities
+    const userIdStr = req.user._id.toString();
+    const activitiesWithMetadata = [...createdActivities, ...completedActivities]
       .map(activity => ({
         ...activity,
         workout: {
           ...activity.workout,
-          isFavorited: favoriteIds.includes(activity.workout._id.toString()),
+          isSaved: (activity.workout.savedBy || []).some(id => id.toString() === userIdStr),
           likedBy: activity.workout.likedBy || []
         }
       }))
       .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
       .slice(0, 50);
 
-    res.json(activitiesWithFavorites);
+    res.json(activitiesWithMetadata);
   } catch (error) {
     console.error('❌ Feed error:', error);
     res.status(500).json({ message: error.message });

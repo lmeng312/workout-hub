@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useContext, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { AuthContext } from '../context/AuthContext';
 import api from '../services/api';
 import SourcePreview from '../components/SourcePreview';
@@ -23,20 +23,25 @@ export default function WorkoutDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
-  const [isFavorited, setIsFavorited] = useState(false);
 
   useEffect(() => {
     loadWorkout();
   }, [workoutId]);
+
+  // Reload workout data when returning from Edit screen
+  useFocusEffect(
+    useCallback(() => {
+      loadWorkout();
+    }, [workoutId])
+  );
 
   const loadWorkout = async () => {
     try {
       const response = await api.get(`/workouts/${workoutId}`);
       setWorkout(response.data);
       const currentUserId = user?.id;
-      setIsSaved(response.data.savedBy?.some(userId => userId.toString() === currentUserId) || false);
+      setIsSaved(response.data.isSaved || false);
       setIsCompleted(response.data.completedBy?.some(completion => completion.user?.toString() === currentUserId) || false);
-      setIsFavorited(response.data.isFavorited || false);
     } catch (error) {
       Alert.alert('Error', 'Failed to load workout');
       navigation.goBack();
@@ -56,20 +61,6 @@ export default function WorkoutDetailScreen() {
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to update save status');
-    }
-  };
-
-  const handleFavorite = async () => {
-    try {
-      if (isFavorited) {
-        await api.post(`/workouts/${workoutId}/unfavorite`);
-        setIsFavorited(false);
-      } else {
-        await api.post(`/workouts/${workoutId}/favorite`);
-        setIsFavorited(true);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to update favorite status');
     }
   };
 
@@ -117,90 +108,52 @@ export default function WorkoutDetailScreen() {
     );
   }
 
+  const formatSetsReps = (exercise) => {
+    if (!exercise.sets || exercise.sets.length === 0) return '';
+    const set = exercise.sets[0];
+    if (set.duration > 0) return `${exercise.sets.length}x${set.duration} sec`;
+    return `${exercise.sets.length}x${set.reps || 0}`;
+  };
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.topRow}>
-          <View style={styles.titleContainer}>
-            <Text style={styles.title}>{workout.title}</Text>
-            {workout.isPublic ? (
-              <Ionicons name="globe-outline" size={20} color="#22c55e" />
-            ) : (
-              <Ionicons name="lock-closed-outline" size={20} color="#6b7280" />
-            )}
-          </View>
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              style={styles.favoriteButtonTop}
-              onPress={handleFavorite}
-            >
-              <Ionicons
-                name={isFavorited ? 'heart' : 'heart-outline'}
-                size={28}
-                color="#ef4444"
-              />
-            </TouchableOpacity>
-            {workout.creator?._id === user?.id && (
-              <TouchableOpacity
-                style={styles.editButtonTop}
-                onPress={() => navigation.navigate('EditWorkout', { workout })}
-              >
-                <Ionicons name="create-outline" size={24} color="#22c55e" />
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-        {workout.creator && (
-          <View style={styles.creatorInfo}>
-            <Ionicons name="person-outline" size={16} color="#94a3b8" />
-            <Text style={styles.creatorText}>
-              {workout.creator.displayName || workout.creator.username}
-            </Text>
-          </View>
-        )}
-        {workout.description && (
-          <Text style={styles.description}>{workout.description}</Text>
-        )}
-        
-        <SourcePreview source={workout.source} variant="full" />
+    <View style={styles.container}>
+    <ScrollView style={styles.scrollContainer}>
+      <View style={styles.titleBlock}>
+        <Text style={styles.title}>{workout.title}</Text>
+        <Text style={styles.subtitle}>
+          Created by @{(workout.creator?.username || 'fituser')} - {workout.estimatedDuration || 45} min - {workout.exercises?.length || 0} exercises
+        </Text>
       </View>
 
       {workout.exercises && workout.exercises.length > 0 ? (
         <View style={styles.exercisesContainer}>
-          <Text style={styles.sectionTitle}>Exercises</Text>
-          {workout.exercises.map((exercise, index) => (
-            <View key={index} style={styles.exerciseCard}>
-              <View style={styles.exerciseHeader}>
-                <View style={styles.exerciseNameContainer}>
-                  {exercise.image && (
-                    <Image
-                      source={{ uri: exercise.image }}
-                      style={styles.exerciseImage}
-                      resizeMode="cover"
-                    />
+          {workout.exercises.map((exercise, index) => {
+            const isFirst = index === 0;
+            const isLast = index === workout.exercises.length - 1;
+            return (
+              <View
+                key={index}
+                style={[
+                  styles.exerciseCard,
+                  isFirst && styles.exerciseCardHighlight,
+                ]}
+              >
+                <View style={styles.exerciseRow}>
+                  <Text style={[styles.exerciseName, isLast && styles.exerciseNameFaded]}>
+                    {index + 1}. {exercise.name}
+                  </Text>
+                  {exercise.sets && exercise.sets.length > 0 && (
+                    <Text style={[styles.exerciseReps, isFirst && styles.exerciseRepsHighlight, isLast && styles.exerciseNameFaded]}>
+                      {formatSetsReps(exercise)}
+                    </Text>
                   )}
-                  <Text style={styles.exerciseName}>{exercise.name}</Text>
                 </View>
-                <Text style={styles.exerciseOrder}>{index + 1}</Text>
+                {exercise.notes ? (
+                  <Text style={styles.exerciseNotes}>{exercise.notes}</Text>
+                ) : null}
               </View>
-              {exercise.sets && exercise.sets.length > 0 && (
-                <View style={styles.setsContainer}>
-                  {exercise.sets.map((set, setIndex) => (
-                    <View key={setIndex} style={styles.setItem}>
-                      <Text style={styles.setText}>
-                        Set {setIndex + 1}: {set.reps} reps
-                        {set.weight > 0 && ` @ ${set.weight}lbs`}
-                        {set.duration > 0 && ` (${set.duration}s)`}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-              {exercise.notes && (
-                <Text style={styles.exerciseNotes}>{exercise.notes}</Text>
-              )}
-            </View>
-          ))}
+            );
+          })}
         </View>
       ) : (
         <View style={styles.emptyExercises}>
@@ -237,154 +190,124 @@ export default function WorkoutDetailScreen() {
         </View>
       </View>
 
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.startButton]}
-          onPress={() => navigation.navigate('WorkoutSession', { workout })}
-        >
-          <Ionicons name="play-circle" size={20} color="#fff" />
-          <Text style={styles.startButtonText}>Start Workout</Text>
-        </TouchableOpacity>
-      </View>
-
       {workout.creator?._id === user?.id && (
         <View style={styles.actionsContainer}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.editButton]}
+            onPress={() => navigation.navigate('EditWorkout', { workout })}
+          >
+            <Ionicons name="create-outline" size={20} color="#22c55e" />
+            <Text style={styles.editButtonText}>Edit</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionButton, styles.deleteButton]}
             onPress={handleDelete}
           >
             <Ionicons name="trash-outline" size={20} color="#ef4444" />
-            <Text style={styles.deleteButtonText}>Delete Workout</Text>
+            <Text style={styles.deleteButtonText}>Delete</Text>
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Spacer so content doesn't hide behind the sticky button */}
+      <View style={{ height: 80 }} />
     </ScrollView>
+
+    {/* Sticky Start Workout button */}
+    <View style={styles.stickyButtonContainer}>
+      <TouchableOpacity
+        style={[styles.actionButton, styles.startButton]}
+        onPress={() => navigation.navigate('WorkoutSession', { workout })}
+      >
+        <Ionicons name="play-circle" size={20} color="#fff" />
+        <Text style={styles.startButtonText}>Start Workout</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#f3f4f6',
   },
-  header: {
-    backgroundColor: '#1e293b',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#334155',
-  },
-  topRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    marginBottom: 8,
-  },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  scrollContainer: {
     flex: 1,
+  },
+  stickyButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    paddingBottom: 24,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  titleBlock: {
+    padding: 16,
+    paddingTop: 8,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
-    flex: 1,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  favoriteButtonTop: {
-    padding: 4,
-  },
-  editButtonTop: {
-    padding: 4,
-  },
-  creatorInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 12,
-  },
-  creatorText: {
-    fontSize: 14,
-    color: '#94a3b8',
-  },
-  description: {
-    fontSize: 16,
-    color: '#e2e8f0',
-    lineHeight: 24,
+    color: '#374151',
     marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#6b7280',
   },
   exercisesContainer: {
     padding: 16,
+    paddingTop: 0,
+  },
+  exerciseCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  exerciseCardHighlight: {
+    borderColor: '#22c55e',
+  },
+  exerciseRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  exerciseName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#111827',
+    flex: 1,
+  },
+  exerciseNameFaded: {
+    color: '#9ca3af',
+  },
+  exerciseReps: {
+    fontSize: 15,
+    color: '#6b7280',
+    fontWeight: '600',
+  },
+  exerciseRepsHighlight: {
+    color: '#22c55e',
+  },
+  exerciseNotes: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontStyle: 'italic',
+    marginTop: 8,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#111827',
     marginBottom: 16,
-  },
-  exerciseCard: {
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  exerciseHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  exerciseNameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  exerciseImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: '#0f172a',
-  },
-  exerciseName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#fff',
-    flex: 1,
-  },
-  exerciseOrder: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#22c55e',
-    backgroundColor: '#166534',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  setsContainer: {
-    marginTop: 8,
-  },
-  setItem: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#334155',
-  },
-  setText: {
-    fontSize: 14,
-    color: '#e2e8f0',
-  },
-  exerciseNotes: {
-    fontSize: 12,
-    color: '#94a3b8',
-    fontStyle: 'italic',
-    marginTop: 8,
   },
   emptyExercises: {
     alignItems: 'center',
@@ -393,12 +316,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: '#6b7280',
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#9ca3af',
     marginTop: 8,
   },
   tagsContainer: {
@@ -410,21 +333,21 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tag: {
-    backgroundColor: '#166534',
+    backgroundColor: '#dcfce7',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
   },
   tagText: {
     fontSize: 14,
-    color: '#dcfce7',
+    color: '#166534',
     fontWeight: '500',
   },
   statsContainer: {
     padding: 16,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#ffffff',
     borderTopWidth: 1,
-    borderTopColor: '#334155',
+    borderTopColor: '#e5e7eb',
     marginBottom: 16,
   },
   statsGrid: {
@@ -440,12 +363,12 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#111827',
     marginTop: 4,
   },
   statLabel: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: '#6b7280',
     fontWeight: '500',
   },
   actionsContainer: {
@@ -463,7 +386,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#22c55e',
-    backgroundColor: '#1e293b',
+    backgroundColor: '#ffffff',
   },
   startButton: {
     backgroundColor: '#22c55e',
@@ -475,25 +398,22 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   editButton: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#ffffff',
     borderColor: '#22c55e',
   },
+  editButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#22c55e',
+  },
   saveButton: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#ffffff',
   },
   savedButton: {
     backgroundColor: '#22c55e',
   },
-  favoriteButton: {
-    backgroundColor: '#1e293b',
-    borderColor: '#ef4444',
-  },
-  favoritedButton: {
-    backgroundColor: '#ef4444',
-    borderColor: '#ef4444',
-  },
   completeButton: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#ffffff',
   },
   completedButton: {
     backgroundColor: '#22c55e',
@@ -503,12 +423,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#22c55e',
   },
-  favoriteButtonText: {
-    color: '#ef4444',
-  },
-  favoritedButtonText: {
-    color: '#fff',
-  },
   savedButtonText: {
     color: '#fff',
   },
@@ -516,7 +430,7 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   deleteButton: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#ffffff',
     borderColor: '#ef4444',
   },
   deleteButtonText: {

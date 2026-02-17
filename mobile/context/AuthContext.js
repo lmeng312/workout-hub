@@ -1,3 +1,10 @@
 import React from 'react';
 
-export const AuthContext = React.createContext();
+const defaultAuthValue = {
+  user: null,
+  token: null,
+  signIn: () => {},
+  signOut: () => {},
+};
+
+export const AuthContext = React.createContext(defaultAuthValue);

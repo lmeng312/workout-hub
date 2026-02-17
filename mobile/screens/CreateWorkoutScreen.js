@@ -87,7 +87,7 @@ export default function CreateWorkoutScreen() {
           return {
             ...ex,
             sets: ex.sets.map((set, idx) =>
-              idx === setIndex ? { ...set, [field]: parseFloat(value) || 0 } : set
+              idx === setIndex ? { ...set, [field]: value } : set
             ),
           };
         }
@@ -131,15 +131,21 @@ export default function CreateWorkoutScreen() {
           isPublic,
           exercises: exercises.map((ex, idx) => ({
             name: ex.name,
-            sets: ex.sets,
+            sets: ex.sets.map((set) => ({
+              reps: parseFloat(set.reps) || 0,
+              weight: parseFloat(set.weight) || 0,
+              duration: parseFloat(set.duration) || 0,
+              rest: parseFloat(set.rest) || 60,
+            })),
             notes: ex.notes,
             order: idx,
           })),
           tags: [],
         };
         const response = await api.post('/workouts', workout);
-        Alert.alert('Success', 'Workout created!');
-        navigation.goBack();
+        Alert.alert('Success', 'Workout created!', [
+          { text: 'OK', onPress: () => navigation.navigate('Main', { screen: 'Library' }) }
+        ]);
       } else {
         // Parse from YouTube or Instagram - show preview first
         const url = mode === 'youtube' ? linkOrText : instagramUrl;
@@ -200,6 +206,7 @@ export default function CreateWorkoutScreen() {
             name="logo-youtube"
             size={20}
             color={mode === 'youtube' ? '#fff' : '#22c55e'}
+
           />
           <Text style={[styles.modeText, mode === 'youtube' && styles.modeTextActive]}>
             YouTube
@@ -217,6 +224,7 @@ export default function CreateWorkoutScreen() {
             name="logo-instagram"
             size={20}
             color={mode === 'instagram' ? '#fff' : '#22c55e'}
+
           />
           <Text style={[styles.modeText, mode === 'instagram' && styles.modeTextActive]}>
             Instagram
@@ -229,14 +237,14 @@ export default function CreateWorkoutScreen() {
           <TextInput
             style={styles.input}
             placeholder="Workout Title *"
-            placeholderTextColor="#64748b"
+            placeholderTextColor="#9ca3af"
             value={title}
             onChangeText={setTitle}
           />
           <TextInput
             style={[styles.input, styles.textArea]}
             placeholder="Description (optional)"
-            placeholderTextColor="#64748b"
+            placeholderTextColor="#9ca3af"
             value={description}
             onChangeText={setDescription}
             multiline
@@ -266,63 +274,73 @@ export default function CreateWorkoutScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Exercise Name *"
-                placeholderTextColor="#64748b"
+                placeholderTextColor="#9ca3af"
                 value={exercise.name}
                 onChangeText={(value) => updateExercise(exercise.id, 'name', value)}
               />
 
               <Text style={styles.setsLabel}>Sets</Text>
-              {exercise.sets.map((set, setIndex) => (
-                <View key={setIndex} style={styles.setRow}>
-                  <Text style={styles.setNumber}>Set {setIndex + 1}</Text>
-                  <View style={styles.setInputs}>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Reps</Text>
+              <View style={styles.setsTable}>
+                <View style={styles.setsHeaderRow}>
+                    <View style={styles.setsHeaderLabel} />
+                    <View style={styles.setInputsRow}>
+                      <Text style={styles.setsHeaderCell}>Reps</Text>
+                      <Text style={styles.setsHeaderCell}>Wt (lbs)</Text>
+                      <Text style={styles.setsHeaderCell}>Time (s)</Text>
+                    </View>
+                    <View style={styles.setsHeaderSpacer} />
+                  </View>
+                {exercise.sets.map((set, setIndex) => {
+                  const prev = setIndex > 0 ? exercise.sets[setIndex - 1] : null;
+                  return (
+                  <View key={setIndex} style={styles.setRow}>
+                    <Text style={styles.setNumber}>Set {setIndex + 1}</Text>
+                    <View style={styles.setInputsRow}>
                       <TextInput
                         style={styles.smallInput}
-                        placeholder="10"
+                        placeholder={prev ? String(prev.reps ?? 10) : '10'}
+                        placeholderTextColor="#9ca3af"
                         keyboardType="numeric"
-                        value={set.reps.toString()}
+                        value={set.reps === '' || set.reps === undefined ? '' : String(set.reps)}
                         onChangeText={(value) =>
                           updateSet(exercise.id, setIndex, 'reps', value)
                         }
                       />
-                    </View>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Weight (lbs)</Text>
                       <TextInput
                         style={styles.smallInput}
-                        placeholder="0"
+                        placeholder={prev ? String(prev.weight ?? 0) : '0'}
+                        placeholderTextColor="#9ca3af"
                         keyboardType="numeric"
-                        value={set.weight.toString()}
+                        value={set.weight === '' || set.weight === undefined ? '' : String(set.weight)}
                         onChangeText={(value) =>
                           updateSet(exercise.id, setIndex, 'weight', value)
                         }
                       />
-                    </View>
-                    <View style={styles.inputGroup}>
-                      <Text style={styles.inputLabel}>Duration (s)</Text>
                       <TextInput
                         style={styles.smallInput}
-                        placeholder="0"
+                        placeholder={prev ? String(prev.duration ?? 0) : '0'}
+                        placeholderTextColor="#9ca3af"
                         keyboardType="numeric"
-                        value={set.duration.toString()}
+                        value={set.duration === '' || set.duration === undefined ? '' : String(set.duration)}
                         onChangeText={(value) =>
                           updateSet(exercise.id, setIndex, 'duration', value)
                         }
                       />
                     </View>
+                    {exercise.sets.length > 1 ? (
+                      <TouchableOpacity
+                        onPress={() => removeSet(exercise.id, setIndex)}
+                        style={styles.removeSetButton}
+                      >
+                        <Ionicons name="close-circle" size={20} color="#ef4444" />
+                      </TouchableOpacity>
+                    ) : (
+                      <View style={styles.removeSetPlaceholder} />
+                    )}
                   </View>
-                  {exercise.sets.length > 1 && (
-                    <TouchableOpacity
-                      onPress={() => removeSet(exercise.id, setIndex)}
-                      style={styles.removeSetButton}
-                    >
-                      <Ionicons name="close-circle" size={20} color="#ef4444" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ))}
+                  );
+                })}
+              </View>
 
               <TouchableOpacity
                 style={styles.addSetButton}
@@ -335,7 +353,7 @@ export default function CreateWorkoutScreen() {
               <TextInput
                 style={[styles.input, { marginTop: 8 }]}
                 placeholder="Notes (optional)"
-                placeholderTextColor="#64748b"
+                placeholderTextColor="#9ca3af"
                 value={exercise.notes}
                 onChangeText={(value) => updateExercise(exercise.id, 'notes', value)}
               />
@@ -356,7 +374,7 @@ export default function CreateWorkoutScreen() {
           <TextInput
             style={[styles.input, styles.textArea]}
             placeholder="Paste YouTube link here..."
-            placeholderTextColor="#64748b"
+            placeholderTextColor="#9ca3af"
             value={linkOrText}
             onChangeText={setLinkOrText}
             multiline
@@ -397,12 +415,12 @@ export default function CreateWorkoutScreen() {
           </View>
 
           <Text style={styles.label}>
-            <Ionicons name="link" size={14} color="#fff" /> Step 1: Post Link
+            <Ionicons name="link" size={14} color="#111827" /> Step 1: Post Link
           </Text>
           <TextInput
             style={styles.input}
             placeholder="Paste Instagram link here..."
-            placeholderTextColor="#64748b"
+            placeholderTextColor="#9ca3af"
             value={instagramUrl}
             onChangeText={setInstagramUrl}
             autoCapitalize="none"
@@ -410,7 +428,7 @@ export default function CreateWorkoutScreen() {
           />
 
           <Text style={[styles.label, { marginTop: 16 }]}>
-            <Ionicons name="chatbox-ellipses" size={14} color="#fff" /> Step 2: Caption Text
+            <Ionicons name="chatbox-ellipses" size={14} color="#111827" /> Step 2: Caption Text
           </Text>
           <TextInput
             style={[styles.input, styles.textArea]}
@@ -421,7 +439,7 @@ Full Body HIIT 🔥
 1. Burpees - 3x15
 2. Push-ups - 3x20
 3. Squats - 3x25"
-            placeholderTextColor="#64748b"
+            placeholderTextColor="#9ca3af"
             value={linkOrText}
             onChangeText={setLinkOrText}
             multiline
@@ -460,7 +478,7 @@ Full Body HIIT 🔥
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#f9fafb',
     padding: 16,
   },
   modeSelector: {
@@ -477,18 +495,18 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 6,
     borderRadius: 12,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#ffffff',
     borderWidth: 2,
-    borderColor: '#8b5cf6',
+    borderColor: '#22c55e',
     minHeight: 48,
   },
   modeButtonActive: {
-    backgroundColor: '#8b5cf6',
+    backgroundColor: '#22c55e',
   },
   modeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#8b5cf6',
+    color: '#22c55e',
     flexShrink: 1,
     textAlign: 'center',
     numberOfLines: 1,
@@ -497,14 +515,14 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   input: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     fontSize: 16,
     borderWidth: 1,
-    borderColor: '#334155',
-    color: '#fff',
+    borderColor: '#e5e7eb',
+    color: '#111827',
   },
   textArea: {
     minHeight: 120,
@@ -513,12 +531,12 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: '#111827',
     marginBottom: 8,
   },
   hint: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#6b7280',
     marginTop: -8,
     marginBottom: 24,
   },
@@ -530,17 +548,17 @@ const styles = StyleSheet.create({
   },
   note: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#6b7280',
     fontStyle: 'italic',
     marginBottom: 16,
   },
   instructionBox: {
-    backgroundColor: '#312e81',
+    backgroundColor: '#eff6ff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#4338ca',
+    borderColor: '#bfdbfe',
   },
   instructionHeader: {
     flexDirection: 'row',
@@ -551,7 +569,7 @@ const styles = StyleSheet.create({
   instructionTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#c7d2fe',
+    color: '#1e40af',
   },
   instructionSteps: {
     gap: 8,
@@ -565,7 +583,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#6366f1',
+    backgroundColor: '#3b82f6',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -576,7 +594,7 @@ const styles = StyleSheet.create({
   },
   stepText: {
     fontSize: 13,
-    color: '#e0e7ff',
+    color: '#1e40af',
     flex: 1,
     paddingTop: 2,
   },
@@ -590,7 +608,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#111827',
   },
   addExerciseButton: {
     flexDirection: 'row',
@@ -603,12 +621,12 @@ const styles = StyleSheet.create({
     color: '#22c55e',
   },
   exerciseCard: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#e5e7eb',
   },
   exerciseHeader: {
     flexDirection: 'row',
@@ -620,7 +638,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#22c55e',
-    backgroundColor: '#166534',
+    backgroundColor: '#dcfce7',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
@@ -631,53 +649,70 @@ const styles = StyleSheet.create({
   setsLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#fff',
+    color: '#111827',
     marginTop: 8,
     marginBottom: 8,
   },
-  setRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    marginBottom: 12,
-    backgroundColor: '#0f172a',
-    padding: 12,
-    borderRadius: 8,
-  },
-  setNumber: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94a3b8',
-    width: 45,
-    paddingTop: 20,
-  },
-  setInputs: {
-    flexDirection: 'row',
-    flex: 1,
-    gap: 8,
-  },
-  inputGroup: {
-    flex: 1,
-    alignItems: 'stretch',
-  },
-  inputLabel: {
-    fontSize: 10,
-    color: '#94a3b8',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  smallInput: {
-    backgroundColor: '#1e293b',
+  setsTable: {
+    backgroundColor: '#f9fafb',
     borderRadius: 8,
     padding: 10,
+  },
+  setsHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  setsHeaderLabel: {
+    width: 40,
+  },
+  setsHeaderCell: {
+    flex: 1,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  setsHeaderSpacer: {
+    width: 24,
+  },
+  setRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  setNumber: {
+    width: 40,
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  setInputsRow: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 6,
+  },
+  smallInput: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 6,
     fontSize: 14,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#e5e7eb',
     textAlign: 'center',
-    color: '#fff',
+    color: '#111827',
   },
   removeSetButton: {
-    padding: 4,
+    width: 24,
+    alignItems: 'center',
+  },
+  removeSetPlaceholder: {
+    width: 24,
   },
   addSetButton: {
     flexDirection: 'row',
@@ -699,40 +734,40 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     padding: 32,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#334155',
+    borderColor: '#e5e7eb',
     borderStyle: 'dashed',
     marginBottom: 24,
   },
   emptyText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: '#6b7280',
     marginTop: 12,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#64748b',
+    color: '#9ca3af',
     marginTop: 4,
   },
   privacyContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#1e293b',
+    backgroundColor: '#ffffff',
     padding: 16,
     borderRadius: 12,
     marginTop: 8,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#e5e7eb',
   },
   privacyLabel: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#fff',
+    color: '#111827',
   },
   createButton: {
     backgroundColor: '#22c55e',

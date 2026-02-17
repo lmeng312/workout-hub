@@ -23,6 +23,16 @@ export default function WorkoutSessionScreen() {
   const [isResting, setIsResting] = useState(false);
   const [restTimeRemaining, setRestTimeRemaining] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [restDuration, setRestDuration] = useState(60); // default 60s
+
+  const adjustRestTime = (delta) => {
+    setRestDuration(prev => Math.max(5, prev + delta));
+  };
+
+  const startManualRest = () => {
+    setRestTimeRemaining(restDuration);
+    setIsResting(true);
+  };
 
   // Main timer
   useEffect(() => {
@@ -38,11 +48,6 @@ export default function WorkoutSessionScreen() {
   // Rest timer
   useEffect(() => {
     if (!isResting || isPaused) return;
-    
-    if (restTimeRemaining <= 0) {
-      setIsResting(false);
-      return;
-    }
 
     const interval = setInterval(() => {
       setRestTimeRemaining(prev => {
@@ -55,7 +60,7 @@ export default function WorkoutSessionScreen() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isResting, restTimeRemaining, isPaused]);
+  }, [isResting, isPaused]);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -69,12 +74,9 @@ export default function WorkoutSessionScreen() {
     } else {
       setCompletedExercises([...completedExercises, index]);
       
-      // Start rest timer if exercise has rest time
-      const exercise = workout.exercises[index];
-      if (exercise.sets && exercise.sets[0]?.rest) {
-        setRestTimeRemaining(exercise.sets[0].rest);
-        setIsResting(true);
-      }
+      // Start rest timer using the user's chosen rest duration
+      setRestTimeRemaining(restDuration);
+      setIsResting(true);
       
       // Move to next exercise
       if (index === currentExerciseIndex && index < workout.exercises.length - 1) {
@@ -97,7 +99,7 @@ export default function WorkoutSessionScreen() {
             try {
               await api.post(`/workouts/${workout._id}/complete`);
               Alert.alert('Great job!', `Workout completed in ${formatTime(elapsedTime)}`, [
-                { text: 'OK', onPress: () => navigation.navigate('Library') }
+                { text: 'OK', onPress: () => navigation.navigate('Main', { screen: 'Discover' }) }
               ]);
             } catch (error) {
               navigation.goBack();
@@ -139,6 +141,14 @@ export default function WorkoutSessionScreen() {
         <View style={styles.restOverlay}>
           <Text style={styles.restTitle}>Rest Time</Text>
           <Text style={styles.restTimer}>{formatTime(restTimeRemaining)}</Text>
+          <View style={styles.restAdjustRow}>
+            <TouchableOpacity style={styles.restAdjustButton} onPress={() => setRestTimeRemaining(prev => Math.max(0, prev - 15))}>
+              <Text style={styles.restAdjustText}>-15s</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.restAdjustButton} onPress={() => setRestTimeRemaining(prev => prev + 15)}>
+              <Text style={styles.restAdjustText}>+15s</Text>
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity 
             style={styles.skipRestButton}
             onPress={() => setIsResting(false)}
@@ -152,13 +162,6 @@ export default function WorkoutSessionScreen() {
       {!isResting && currentExercise && (
         <View style={styles.currentExerciseCard}>
           <Text style={styles.currentLabel}>CURRENT EXERCISE</Text>
-          {currentExercise.image && (
-            <Image
-              source={{ uri: currentExercise.image }}
-              style={styles.currentExerciseImage}
-              resizeMode="cover"
-            />
-          )}
           <Text style={styles.currentName}>{currentExercise.name}</Text>
           {currentExercise.sets && currentExercise.sets[0] && (
             <View style={styles.currentDetails}>
@@ -178,13 +181,36 @@ export default function WorkoutSessionScreen() {
               )}
             </View>
           )}
-          <TouchableOpacity
-            style={styles.completeCurrentButton}
-            onPress={() => handleCompleteExercise(currentExerciseIndex)}
-          >
-            <Ionicons name="checkmark-circle" size={24} color="#fff" />
-            <Text style={styles.completeCurrentText}>Mark Complete</Text>
-          </TouchableOpacity>
+          {/* Rest time setter */}
+          <View style={styles.restSetterContainer}>
+            <Text style={styles.restSetterLabel}>Rest after exercise</Text>
+            <View style={styles.restSetterControls}>
+              <TouchableOpacity style={styles.restSetterButton} onPress={() => adjustRestTime(-15)}>
+                <Ionicons name="remove" size={18} color="#166534" />
+              </TouchableOpacity>
+              <Text style={styles.restSetterValue}>{restDuration}s</Text>
+              <TouchableOpacity style={styles.restSetterButton} onPress={() => adjustRestTime(15)}>
+                <Ionicons name="add" size={18} color="#166534" />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.currentButtonsRow}>
+            <TouchableOpacity
+              style={styles.completeCurrentButton}
+              onPress={() => handleCompleteExercise(currentExerciseIndex)}
+            >
+              <Ionicons name="checkmark-circle" size={24} color="#fff" />
+              <Text style={styles.completeCurrentText}>Mark Complete</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.startRestButton}
+              onPress={startManualRest}
+            >
+              <Ionicons name="timer-outline" size={20} color="#166534" />
+              <Text style={styles.startRestText}>Rest</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -214,13 +240,6 @@ export default function WorkoutSessionScreen() {
                     <Ionicons name="checkmark" size={16} color="#fff" />
                   )}
                 </View>
-                {exercise.image && (
-                  <Image
-                    source={{ uri: exercise.image }}
-                    style={styles.exerciseItemImage}
-                    resizeMode="cover"
-                  />
-                )}
                 <View style={styles.exerciseItemInfo}>
                   <Text style={[
                     styles.exerciseItemName,
@@ -332,6 +351,23 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 32,
   },
+  restAdjustRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 24,
+  },
+  restAdjustButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#fff',
+  },
+  restAdjustText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
   skipRestButton: {
     paddingHorizontal: 24,
     paddingVertical: 12,
@@ -382,7 +418,48 @@ const styles = StyleSheet.create({
     color: '#166534',
     fontWeight: '500',
   },
+  restSetterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#bbf7d0',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
+  restSetterLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#166534',
+  },
+  restSetterControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  restSetterButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#dcfce7',
+    borderWidth: 1,
+    borderColor: '#86efac',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  restSetterValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#166534',
+    minWidth: 40,
+    textAlign: 'center',
+  },
+  currentButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
   completeCurrentButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -395,6 +472,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#fff',
+  },
+  startRestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#86efac',
+  },
+  startRestText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#166534',
   },
   exerciseList: {
     flex: 1,

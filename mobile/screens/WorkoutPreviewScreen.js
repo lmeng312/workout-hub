@@ -40,7 +40,7 @@ export default function WorkoutPreviewScreen() {
       });
       
       Alert.alert('Success', 'Workout saved successfully!', [
-        { text: 'OK', onPress: () => navigation.navigate('Library') }
+        { text: 'OK', onPress: () => navigation.navigate('Main', { screen: 'Library' }) }
       ]);
     } catch (error) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to save workout');

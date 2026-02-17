@@ -14,7 +14,11 @@ const { enrichExercisesWithImages } = require('../utils/exerciseImageLookup');
 // Load environment variables
 require('dotenv').config();
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://lmeng326_db_user:Rfej1UzHvP0QOljp@fitcommunity.ksfdnsk.mongodb.net/workout_app?retryWrites=true&w=majority';
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  console.error('❌ MONGODB_URI is not set. Add it to backend/.env');
+  process.exit(1);
+}
 
 async function migrateExerciseImages() {
   try {
