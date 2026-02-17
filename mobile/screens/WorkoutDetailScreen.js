@@ -13,6 +13,7 @@ import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/nativ
 import { AuthContext } from '../context/AuthContext';
 import api from '../services/api';
 import SourcePreview from '../components/SourcePreview';
+import VideoEmbed from '../components/VideoEmbed';
 
 export default function WorkoutDetailScreen() {
   const route = useRoute();
@@ -124,6 +125,10 @@ export default function WorkoutDetailScreen() {
           Created by @{(workout.creator?.username || 'fituser')} - {workout.estimatedDuration || 45} min - {workout.exercises?.length || 0} exercises
         </Text>
       </View>
+
+      {workout.source && workout.source.type !== 'custom' && (
+        <VideoEmbed source={workout.source} />
+      )}
 
       {workout.exercises && workout.exercises.length > 0 ? (
         <View style={styles.exercisesContainer}>

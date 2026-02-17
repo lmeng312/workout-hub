@@ -19,8 +19,9 @@ import { Ionicons } from '@expo/vector-icons';
  * Props:
  * - source: object with { type, url, preview: { thumbnail, sourceTitle, sourceCreator, sourceDuration } }
  * - variant: 'full' (with thumbnail) or 'badge' (compact badge only)
+ * - onPress: optional override for the default open-URL behavior
  */
-export default function SourcePreview({ source, variant = 'full' }) {
+export default function SourcePreview({ source, variant = 'full', onPress }) {
   if (!source || !source.url || source.type === 'custom') {
     return null;
   }
@@ -80,12 +81,14 @@ export default function SourcePreview({ source, variant = 'full' }) {
     return secs > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${mins}m`;
   };
 
+  const handlePress = onPress || handleOpenSource;
+
   // Badge variant - compact display for cards
   if (variant === 'badge') {
     return (
       <TouchableOpacity
         style={[styles.badge, { borderColor: getSourceColor() }]}
-        onPress={handleOpenSource}
+        onPress={handlePress}
       >
         <Ionicons name={getSourceIcon()} size={14} color={getSourceColor()} />
         <Text style={[styles.badgeText, { color: getSourceColor() }]}>
@@ -98,7 +101,7 @@ export default function SourcePreview({ source, variant = 'full' }) {
 
   // Full variant - with thumbnail and metadata
   return (
-    <TouchableOpacity style={styles.container} onPress={handleOpenSource}>
+    <TouchableOpacity style={styles.container} onPress={handlePress}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Ionicons name={getSourceIcon()} size={20} color={getSourceColor()} />

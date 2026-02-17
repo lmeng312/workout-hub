@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,24 +6,26 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import api from '../services/api';
+import VideoEmbed from '../components/VideoEmbed';
 
 export default function WorkoutSessionScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { workout } = route.params;
-  
+  const scrollRef = useRef(null);
+  const itemPositions = useRef({});
+
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [completedExercises, setCompletedExercises] = useState([]);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isResting, setIsResting] = useState(false);
   const [restTimeRemaining, setRestTimeRemaining] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const [restDuration, setRestDuration] = useState(60); // default 60s
+  const [restDuration, setRestDuration] = useState(60);
 
   const adjustRestTime = (delta) => {
     setRestDuration(prev => Math.max(5, prev + delta));
@@ -37,18 +39,15 @@ export default function WorkoutSessionScreen() {
   // Main timer
   useEffect(() => {
     if (isPaused) return;
-    
     const interval = setInterval(() => {
       setElapsedTime(prev => prev + 1);
     }, 1000);
-
     return () => clearInterval(interval);
   }, [isPaused]);
 
   // Rest timer
   useEffect(() => {
     if (!isResting || isPaused) return;
-
     const interval = setInterval(() => {
       setRestTimeRemaining(prev => {
         if (prev <= 1) {
@@ -58,7 +57,6 @@ export default function WorkoutSessionScreen() {
         return prev - 1;
       });
     }, 1000);
-
     return () => clearInterval(interval);
   }, [isResting, isPaused]);
 
@@ -68,35 +66,50 @@ export default function WorkoutSessionScreen() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const scrollToExercise = (index) => {
+    const y = itemPositions.current[index];
+    if (y != null && scrollRef.current) {
+      scrollRef.current.scrollTo({ y: Math.max(0, y - 8), animated: true });
+    }
+  };
+
+  const navigateToExercise = (index) => {
+    setCurrentExerciseIndex(index);
+    scrollToExercise(index);
+  };
+
   const handleCompleteExercise = (index) => {
     if (completedExercises.includes(index)) {
       setCompletedExercises(completedExercises.filter(i => i !== index));
-      // When deselecting, show the deselected exercise as current in the main view and list
       setCurrentExerciseIndex(index);
     } else {
       setCompletedExercises([...completedExercises, index]);
-      
-      // Start rest timer using the user's chosen rest duration
       setRestTimeRemaining(restDuration);
       setIsResting(true);
-      
-      // Move to next exercise
+
       if (index === currentExerciseIndex && index < workout.exercises.length - 1) {
-        setCurrentExerciseIndex(index + 1);
+        const nextIndex = index + 1;
+        setCurrentExerciseIndex(nextIndex);
+        setTimeout(() => scrollToExercise(nextIndex), 300);
       }
     }
   };
 
   const handleFinishWorkout = async () => {
     const completionRate = (completedExercises.length / workout.exercises.length * 100).toFixed(0);
-    
+
     Alert.alert(
       'Finish Workout?',
       `You completed ${completedExercises.length}/${workout.exercises.length} exercises (${completionRate}%)\nTime: ${formatTime(elapsedTime)}`,
       [
         { text: 'Keep Going', style: 'cancel' },
         {
-          text: 'Finish',
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () => navigation.goBack(),
+        },
+        {
+          text: 'Finish Workout',
           onPress: async () => {
             try {
               await api.post(`/workouts/${workout._id}/complete`, { durationSeconds: elapsedTime });
@@ -112,30 +125,41 @@ export default function WorkoutSessionScreen() {
     );
   };
 
-  const currentExercise = workout.exercises[currentExerciseIndex];
   const progress = (completedExercises.length / workout.exercises.length) * 100;
+
+  const formatExerciseDetail = (exercise) => {
+    if (!exercise.sets || !exercise.sets[0]) return null;
+    const set = exercise.sets[0];
+    const count = exercise.sets.length;
+    if (set.duration > 0) {
+      return `${set.duration}s${count > 1 ? ` × ${count} sets` : ''}`;
+    }
+    return `${set.reps} reps${count > 1 ? ` × ${count} sets` : ''}`;
+  };
 
   return (
     <View style={styles.container}>
       {/* Header with timer and progress */}
       <View style={styles.header}>
         <View style={styles.timerContainer}>
-          <Ionicons name="time-outline" size={24} color="#22c55e" />
+          <Ionicons name="time-outline" size={20} color="#22c55e" />
           <Text style={styles.timerText}>{formatTime(elapsedTime)}</Text>
         </View>
+        <View style={styles.progressPill}>
+          <Text style={styles.progressPillText}>
+            {completedExercises.length}/{workout.exercises.length}
+          </Text>
+        </View>
         <TouchableOpacity onPress={() => setIsPaused(!isPaused)} style={styles.pauseButton}>
-          <Ionicons name={isPaused ? 'play' : 'pause'} size={24} color="#22c55e" />
+          <Ionicons name={isPaused ? 'play' : 'pause'} size={20} color="#22c55e" />
         </TouchableOpacity>
       </View>
 
       {/* Progress bar */}
-      <View style={styles.progressContainer}>
+      <View style={styles.progressBarContainer}>
         <View style={styles.progressBar}>
           <View style={[styles.progressFill, { width: `${progress}%` }]} />
         </View>
-        <Text style={styles.progressText}>
-          {completedExercises.length}/{workout.exercises.length} exercises
-        </Text>
       </View>
 
       {/* Rest timer overlay */}
@@ -151,7 +175,7 @@ export default function WorkoutSessionScreen() {
               <Text style={styles.restAdjustText}>+15s</Text>
             </TouchableOpacity>
           </View>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.skipRestButton}
             onPress={() => setIsResting(false)}
           >
@@ -160,122 +184,122 @@ export default function WorkoutSessionScreen() {
         </View>
       )}
 
-      {/* Current exercise highlight */}
-      {!isResting && currentExercise && (
-        <View style={styles.currentExerciseCard}>
-          <Text style={styles.currentLabel}>CURRENT EXERCISE</Text>
-          <Text style={styles.currentName}>{currentExercise.name}</Text>
-          {currentExercise.sets && currentExercise.sets[0] && (
-            <View style={styles.currentDetails}>
-              {currentExercise.sets[0].duration > 0 ? (
-                <Text style={styles.currentDetailText}>
-                  {currentExercise.sets[0].duration}s duration
-                </Text>
-              ) : (
-                <Text style={styles.currentDetailText}>
-                  {currentExercise.sets[0].reps} reps
-                </Text>
-              )}
-              {currentExercise.sets.length > 1 && (
-                <Text style={styles.currentDetailText}>
-                  × {currentExercise.sets.length} sets
-                </Text>
-              )}
-            </View>
-          )}
-          {/* Rest time setter */}
-          <View style={styles.restSetterContainer}>
-            <Text style={styles.restSetterLabel}>Rest after exercise</Text>
-            <View style={styles.restSetterControls}>
-              <TouchableOpacity style={styles.restSetterButton} onPress={() => adjustRestTime(-15)}>
-                <Ionicons name="remove" size={18} color="#166534" />
-              </TouchableOpacity>
-              <Text style={styles.restSetterValue}>{restDuration}s</Text>
-              <TouchableOpacity style={styles.restSetterButton} onPress={() => adjustRestTime(15)}>
-                <Ionicons name="add" size={18} color="#166534" />
-              </TouchableOpacity>
-            </View>
-          </View>
+      {/* Full exercise list — current exercise expanded inline */}
+      <ScrollView ref={scrollRef} style={styles.exerciseList} contentContainerStyle={styles.exerciseListContent}>
+        {/* Source video (collapsible) */}
+        {workout.source && workout.source.type !== 'custom' && (
+          <VideoEmbed source={workout.source} collapsible />
+        )}
 
-          <View style={styles.currentButtonsRow}>
-            <TouchableOpacity
-              style={styles.completeCurrentButton}
-              onPress={() => handleCompleteExercise(currentExerciseIndex)}
-            >
-              <Ionicons name="checkmark-circle" size={24} color="#fff" />
-              <Text style={styles.completeCurrentText}>Mark Complete</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.startRestButton}
-              onPress={startManualRest}
-            >
-              <Ionicons name="timer-outline" size={20} color="#166534" />
-              <Text style={styles.startRestText}>Rest</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {/* Exercise list */}
-      <ScrollView style={styles.exerciseList}>
-        <Text style={styles.listTitle}>All Exercises</Text>
         {workout.exercises.map((exercise, index) => {
           const isCompleted = completedExercises.includes(index);
           const isCurrent = index === currentExerciseIndex;
-          
+          const detail = formatExerciseDetail(exercise);
+
           return (
-            <TouchableOpacity
+            <View
               key={index}
-              style={[
-                styles.exerciseItem,
-                isCompleted && styles.exerciseItemCompleted,
-                isCurrent && styles.exerciseItemCurrent,
-              ]}
-              onPress={() => handleCompleteExercise(index)}
+              onLayout={(e) => { itemPositions.current[index] = e.nativeEvent.layout.y; }}
             >
-              <View style={styles.exerciseItemLeft}>
-                <View style={[
-                  styles.checkbox,
-                  isCompleted && styles.checkboxCompleted
-                ]}>
-                  {isCompleted && (
-                    <Ionicons name="checkmark" size={16} color="#fff" />
-                  )}
+              {isCurrent && !isCompleted ? (
+                /* Expanded current exercise card */
+                <View style={styles.currentCard}>
+                  <View style={styles.currentCardHeader}>
+                    <View style={styles.currentNumberBadge}>
+                      <Text style={styles.currentNumberText}>{index + 1}</Text>
+                    </View>
+                    <View style={styles.currentCardHeaderText}>
+                      <Text style={styles.currentCardName}>{exercise.name}</Text>
+                      {detail && <Text style={styles.currentCardDetail}>{detail}</Text>}
+                    </View>
+                  </View>
+                  {exercise.notes ? (
+                    <Text style={styles.currentCardNotes}>{exercise.notes}</Text>
+                  ) : null}
+
+                  {/* Rest time setter */}
+                  <View style={styles.restSetterContainer}>
+                    <Text style={styles.restSetterLabel}>Rest</Text>
+                    <View style={styles.restSetterControls}>
+                      <TouchableOpacity style={styles.restSetterButton} onPress={() => adjustRestTime(-15)}>
+                        <Ionicons name="remove" size={16} color="#166534" />
+                      </TouchableOpacity>
+                      <Text style={styles.restSetterValue}>{restDuration}s</Text>
+                      <TouchableOpacity style={styles.restSetterButton} onPress={() => adjustRestTime(15)}>
+                        <Ionicons name="add" size={16} color="#166534" />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={styles.currentButtonsRow}>
+                    <TouchableOpacity
+                      style={styles.completeCurrentButton}
+                      onPress={() => handleCompleteExercise(index)}
+                    >
+                      <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                      <Text style={styles.completeCurrentText}>Done</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.manualRestButton}
+                      onPress={startManualRest}
+                    >
+                      <Ionicons name="timer-outline" size={18} color="#166534" />
+                      <Text style={styles.manualRestText}>Rest</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-                <View style={styles.exerciseItemInfo}>
-                  <Text style={[
-                    styles.exerciseItemName,
-                    isCompleted && styles.exerciseItemNameCompleted
-                  ]}>
-                    {exercise.name}
-                  </Text>
-                  {exercise.sets && exercise.sets[0] && (
-                    <Text style={styles.exerciseItemDetails}>
-                      {exercise.sets[0].duration > 0 
-                        ? `${exercise.sets[0].duration}s`
-                        : `${exercise.sets[0].reps} reps`}
-                      {exercise.sets.length > 1 && ` × ${exercise.sets.length}`}
+              ) : (
+                /* Compact exercise row */
+                <TouchableOpacity
+                  style={[
+                    styles.exerciseRow,
+                    isCompleted && styles.exerciseRowCompleted,
+                  ]}
+                  onPress={() => isCompleted ? handleCompleteExercise(index) : navigateToExercise(index)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.checkbox, isCompleted && styles.checkboxCompleted]}>
+                    {isCompleted ? (
+                      <Ionicons name="checkmark" size={14} color="#fff" />
+                    ) : (
+                      <Text style={styles.exerciseNumber}>{index + 1}</Text>
+                    )}
+                  </View>
+                  <View style={styles.exerciseRowInfo}>
+                    <Text
+                      style={[styles.exerciseRowName, isCompleted && styles.exerciseRowNameCompleted]}
+                      numberOfLines={1}
+                    >
+                      {exercise.name}
                     </Text>
+                    {detail && (
+                      <Text style={styles.exerciseRowDetail}>{detail}</Text>
+                    )}
+                  </View>
+                  {!isCompleted && (
+                    <TouchableOpacity
+                      style={styles.quickCompleteButton}
+                      onPress={() => handleCompleteExercise(index)}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="checkmark-circle-outline" size={24} color="#d1d5db" />
+                    </TouchableOpacity>
                   )}
-                </View>
-              </View>
-              {isCurrent && !isCompleted && (
-                <View style={styles.currentBadge}>
-                  <Text style={styles.currentBadgeText}>Current</Text>
-                </View>
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>
+            </View>
           );
         })}
+        <View style={{ height: 16 }} />
       </ScrollView>
 
-      {/* Finish button */}
+      {/* Footer */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={styles.finishButton}
           onPress={handleFinishWorkout}
         >
-          <Ionicons name="checkmark-done" size={24} color="#fff" />
+          <Ionicons name="checkmark-done" size={22} color="#fff" />
           <Text style={styles.finishButtonText}>Finish Workout</Text>
         </TouchableOpacity>
       </View>
@@ -288,48 +312,68 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
   },
+
+  // Header
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+    gap: 12,
   },
   timerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    flex: 1,
   },
   timerText: {
-    fontSize: 32,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#111827',
+    fontVariant: ['tabular-nums'],
+  },
+  progressPill: {
+    backgroundColor: '#dcfce7',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  progressPillText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#166534',
   },
   pauseButton: {
-    padding: 8,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f0fdf4',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  progressContainer: {
-    padding: 16,
+
+  // Progress bar
+  progressBarContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
     backgroundColor: '#fff',
   },
   progressBar: {
-    height: 8,
+    height: 4,
     backgroundColor: '#e5e7eb',
-    borderRadius: 4,
+    borderRadius: 2,
     overflow: 'hidden',
-    marginBottom: 8,
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#22c55e',
   },
-  progressText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
+
+  // Rest overlay
   restOverlay: {
     position: 'absolute',
     top: 0,
@@ -352,6 +396,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 32,
+    fontVariant: ['tabular-nums'],
   },
   restAdjustRow: {
     flexDirection: 'row',
@@ -382,78 +427,98 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
-  currentExerciseCard: {
-    margin: 16,
-    padding: 20,
-    backgroundColor: '#dcfce7',
-    borderRadius: 16,
+
+  // Exercise list
+  exerciseList: {
+    flex: 1,
+  },
+  exerciseListContent: {
+    padding: 12,
+    paddingBottom: 0,
+  },
+
+  // Current exercise — expanded inline card
+  currentCard: {
+    backgroundColor: '#f0fdf4',
+    borderRadius: 14,
     borderWidth: 2,
     borderColor: '#22c55e',
-  },
-  currentLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#166534',
+    padding: 16,
     marginBottom: 8,
-    letterSpacing: 1,
   },
-  currentExerciseImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12,
-    marginBottom: 12,
-    backgroundColor: '#f3f4f6',
-  },
-  currentName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  currentDetails: {
+  currentCardHeader: {
     flexDirection: 'row',
-    gap: 16,
-    marginBottom: 16,
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 12,
   },
-  currentDetailText: {
-    fontSize: 16,
+  currentNumberBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#22c55e',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  currentNumberText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  currentCardHeaderText: {
+    flex: 1,
+  },
+  currentCardName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#111827',
+  },
+  currentCardDetail: {
+    fontSize: 14,
     color: '#166534',
     fontWeight: '500',
+    marginTop: 2,
+  },
+  currentCardNotes: {
+    fontSize: 13,
+    color: '#6b7280',
+    fontStyle: 'italic',
+    marginBottom: 12,
+    paddingLeft: 44,
   },
   restSetterContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#bbf7d0',
+    backgroundColor: '#dcfce7',
     borderRadius: 10,
-    padding: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
     marginBottom: 12,
   },
   restSetterLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: '#166534',
   },
   restSetterControls: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
   restSetterButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#dcfce7',
-    borderWidth: 1,
-    borderColor: '#86efac',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#bbf7d0',
     alignItems: 'center',
     justifyContent: 'center',
   },
   restSetterValue: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#166534',
-    minWidth: 40,
+    minWidth: 36,
     textAlign: 'center',
   },
   currentButtonsRow: {
@@ -465,78 +530,54 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     backgroundColor: '#22c55e',
-    padding: 16,
+    paddingVertical: 14,
     borderRadius: 12,
   },
   completeCurrentText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#fff',
   },
-  startRestButton: {
+  manualRestButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 5,
     backgroundColor: '#dcfce7',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 14,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#86efac',
   },
-  startRestText: {
+  manualRestText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#166534',
   },
-  exerciseList: {
-    flex: 1,
-    padding: 16,
-  },
-  listTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 12,
-  },
-  exerciseItem: {
+
+  // Compact exercise row
+  exerciseRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
     backgroundColor: '#fff',
     borderRadius: 12,
+    padding: 14,
     marginBottom: 8,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  exerciseItemCurrent: {
-    borderColor: '#22c55e',
-    backgroundColor: '#f0fdf4',
-  },
-  exerciseItemCompleted: {
-    backgroundColor: '#f9fafb',
-    opacity: 0.7,
-  },
-  exerciseItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 12,
-    flex: 1,
+    borderWidth: 1,
+    borderColor: '#f3f4f6',
   },
-  exerciseItemImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    backgroundColor: '#f3f4f6',
+  exerciseRowCompleted: {
+    backgroundColor: '#f9fafb',
+    opacity: 0.6,
   },
   checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     borderWidth: 2,
     borderColor: '#d1d5db',
     alignItems: 'center',
@@ -546,36 +587,36 @@ const styles = StyleSheet.create({
     backgroundColor: '#22c55e',
     borderColor: '#22c55e',
   },
-  exerciseItemInfo: {
+  exerciseNumber: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#9ca3af',
+  },
+  exerciseRowInfo: {
     flex: 1,
   },
-  exerciseItemName: {
-    fontSize: 16,
+  exerciseRowName: {
+    fontSize: 15,
     fontWeight: '600',
     color: '#111827',
-    marginBottom: 4,
   },
-  exerciseItemNameCompleted: {
+  exerciseRowNameCompleted: {
     textDecorationLine: 'line-through',
     color: '#6b7280',
   },
-  exerciseItemDetails: {
-    fontSize: 14,
+  exerciseRowDetail: {
+    fontSize: 13,
     color: '#6b7280',
+    marginTop: 2,
   },
-  currentBadge: {
-    backgroundColor: '#22c55e',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+  quickCompleteButton: {
+    padding: 4,
   },
-  currentBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#fff',
-  },
+
+  // Footer
   footer: {
-    padding: 16,
+    padding: 12,
+    paddingBottom: 24,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
@@ -586,11 +627,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     backgroundColor: '#22c55e',
-    padding: 16,
+    paddingVertical: 16,
     borderRadius: 12,
   },
   finishButtonText: {
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: 'bold',
     color: '#fff',
   },
