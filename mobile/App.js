@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View } from 'react-native';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -24,6 +24,18 @@ import { PRIMARY_GREEN } from './theme';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
+
+const styles = StyleSheet.create({
+  loadingScreen: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingSpinner: {
+    marginTop: 24,
+  },
+});
 
 function CreatePlaceholder() {
   return <View style={{ flex: 1 }} />;
@@ -66,7 +78,7 @@ function MainTabs() {
           height: 65,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 10,
           fontWeight: '600',
         },
         headerStyle: {
@@ -118,19 +130,27 @@ export default function App() {
       if (token && userData) {
         // Validate access token against the server
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
           const response = await fetch(`${API_BASE_URL}/auth/me`, {
             headers: { Authorization: `Bearer ${token}` },
+            signal: controller.signal,
           });
+          clearTimeout(timeoutId);
           if (response.ok) {
             setUserToken(token);
             setUser(JSON.parse(userData));
           } else if (refreshToken) {
             // Access token expired — try refreshing
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
             const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ refreshToken }),
+              signal: controller.signal,
             });
+            clearTimeout(timeoutId);
             if (refreshResponse.ok) {
               const data = await refreshResponse.json();
               await AsyncStorage.setItem('userToken', data.token);
@@ -209,7 +229,12 @@ export default function App() {
   }, []);
 
   if (isLoading) {
-    return null;
+    return (
+      <View style={styles.loadingScreen}>
+        <Logo size="large" />
+        <ActivityIndicator size="large" color={PRIMARY_GREEN} style={styles.loadingSpinner} />
+      </View>
+    );
   }
 
   return (

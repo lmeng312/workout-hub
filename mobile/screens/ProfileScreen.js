@@ -122,19 +122,19 @@ export default function ProfileScreen() {
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{stats.workoutsCreated}</Text>
-          <Text style={styles.statLabel}>Created</Text>
+          <Text style={styles.statLabel} numberOfLines={1}>Created</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{stats.workoutsCompleted}</Text>
-          <Text style={styles.statLabel}>Completed</Text>
+          <Text style={styles.statLabel} numberOfLines={1}>Completed</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{stats.following}</Text>
-          <Text style={styles.statLabel}>Following</Text>
+          <Text style={styles.statLabel} numberOfLines={1}>Following</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={styles.statValue}>{stats.followers}</Text>
-          <Text style={styles.statLabel}>Followers</Text>
+          <Text style={styles.statLabel} numberOfLines={1}>Followers</Text>
         </View>
       </View>
 
@@ -267,15 +267,16 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingTop: 16,
-    gap: 12,
+    gap: 6,
   },
   statCard: {
     flex: 1,
     backgroundColor: '#ffffff',
     borderRadius: 12,
-    padding: 16,
+    padding: 10,
+    paddingHorizontal: 6,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#e5e7eb',
@@ -340,11 +341,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 10,
+    fontSize: 7,
+    fontWeight: '600',
     color: '#6b7280',
     textTransform: 'uppercase',
     textAlign: 'center',
-    numberOfLines: 1,
   },
   menuContainer: {
     backgroundColor: '#ffffff',
