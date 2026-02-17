@@ -15,6 +15,8 @@ import WorkoutPreviewScreen from './screens/WorkoutPreviewScreen';
 import EditWorkoutScreen from './screens/EditWorkoutScreen';
 import WorkoutSessionScreen from './screens/WorkoutSessionScreen';
 import ProfileScreen from './screens/ProfileScreen';
+import EditProfileScreen from './screens/EditProfileScreen';
+import SettingsScreen from './screens/SettingsScreen';
 import FeedScreen from './screens/FeedScreen';
 import Logo from './components/Logo';
 import { AuthContext } from './context/AuthContext';
@@ -189,6 +191,17 @@ export default function App() {
     }
   };
 
+  const updateUser = async (updates) => {
+    try {
+      if (!user) return;
+      const merged = { ...user, ...updates };
+      await AsyncStorage.setItem('userData', JSON.stringify(merged));
+      setUser(merged);
+    } catch (error) {
+      console.error('Error updating user:', error);
+    }
+  };
+
   const signOut = async () => {
     try {
       // Revoke refresh token on the server
@@ -219,6 +232,7 @@ export default function App() {
   const authContext = {
     signIn,
     signOut,
+    updateUser,
     user,
     token: userToken,
   };
@@ -296,6 +310,26 @@ export default function App() {
                   headerTintColor: '#111827',
                   title: 'Workout Session',
                   headerLeft: null,
+                }}
+              />
+              <Stack.Screen 
+                name="EditProfile" 
+                component={EditProfileScreen}
+                options={{
+                  headerShown: true,
+                  headerStyle: { backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb', shadowOpacity: 0, elevation: 0 },
+                  headerTintColor: '#111827',
+                  title: 'Edit Profile',
+                }}
+              />
+              <Stack.Screen 
+                name="Settings" 
+                component={SettingsScreen}
+                options={{
+                  headerShown: true,
+                  headerStyle: { backgroundColor: '#ffffff', borderBottomWidth: 1, borderBottomColor: '#e5e7eb', shadowOpacity: 0, elevation: 0 },
+                  headerTintColor: '#111827',
+                  title: 'Settings',
                 }}
               />
             </>

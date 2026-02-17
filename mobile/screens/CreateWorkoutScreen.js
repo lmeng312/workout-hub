@@ -386,38 +386,11 @@ export default function CreateWorkoutScreen() {
             autoCapitalize="none"
           />
           <Text style={styles.hint}>
-            The app will extract workout information from the video title and description.
+            Workout information will be extracted from the post content.
           </Text>
         </View>
       ) : (
         <View>
-          <View style={styles.instructionBox}>
-            <View style={styles.instructionHeader}>
-              <Ionicons name="information-circle" size={20} color="#6366f1" />
-              <Text style={styles.instructionTitle}>How to import from Instagram</Text>
-            </View>
-            <View style={styles.instructionSteps}>
-              <View style={styles.instructionStep}>
-                <View style={styles.stepNumber}>
-                  <Text style={styles.stepNumberText}>1</Text>
-                </View>
-                <Text style={styles.stepText}>Tap Share (•••) on the Instagram post</Text>
-              </View>
-              <View style={styles.instructionStep}>
-                <View style={styles.stepNumber}>
-                  <Text style={styles.stepNumberText}>2</Text>
-                </View>
-                <Text style={styles.stepText}>Select "Copy Link" and paste below</Text>
-              </View>
-              <View style={styles.instructionStep}>
-                <View style={styles.stepNumber}>
-                  <Text style={styles.stepNumberText}>3</Text>
-                </View>
-                <Text style={styles.stepText}>Copy the caption text and paste it too</Text>
-              </View>
-            </View>
-          </View>
-
           <Text style={styles.label}>
             <Ionicons name="link" size={14} color="#111827" /> Step 1: Post Link
           </Text>
@@ -449,8 +422,8 @@ Full Body HIIT 🔥
             multiline
             numberOfLines={8}
           />
-          <Text style={styles.successHint}>
-            <Ionicons name="checkmark-circle" size={12} color="#22c55e" /> The app will extract exercises, sets, and reps automatically
+          <Text style={styles.hint}>
+            Workout information will be extracted from the post content.
           </Text>
         </View>
       )}
@@ -544,63 +517,11 @@ const styles = StyleSheet.create({
     marginTop: -8,
     marginBottom: 24,
   },
-  successHint: {
-    fontSize: 12,
-    color: '#22c55e',
-    marginTop: 4,
-    marginBottom: 24,
-  },
   note: {
     fontSize: 12,
     color: '#6b7280',
     fontStyle: 'italic',
     marginBottom: 16,
-  },
-  instructionBox: {
-    backgroundColor: '#eff6ff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#bfdbfe',
-  },
-  instructionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  instructionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e40af',
-  },
-  instructionSteps: {
-    gap: 8,
-  },
-  instructionStep: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  stepNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#3b82f6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepNumberText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  stepText: {
-    fontSize: 13,
-    color: '#1e40af',
-    flex: 1,
-    paddingTop: 2,
   },
   sectionHeader: {
     flexDirection: 'row',

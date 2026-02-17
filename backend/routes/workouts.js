@@ -257,10 +257,12 @@ router.post('/:id/complete', auth, async (req, res) => {
       completion => completion.user.toString() !== req.user._id.toString()
     );
 
-    // Add new completion
+    // Add new completion (durationSeconds = actual time in seconds from WorkoutSessionScreen)
+    const durationSeconds = req.body.durationSeconds != null ? Math.round(Number(req.body.durationSeconds)) : 0;
     workout.completedBy.push({
       user: req.user._id,
-      completedAt: new Date()
+      completedAt: new Date(),
+      durationSeconds: durationSeconds >= 0 ? durationSeconds : 0
     });
 
     await workout.save();

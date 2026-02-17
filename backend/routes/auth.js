@@ -403,6 +403,78 @@ router.post('/logout', auth, async (req, res) => {
   }
 });
 
+// Change password (requires current password)
+router.post('/change-password', auth, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Current password and new password are required.' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'New password must be at least 6 characters.' });
+    }
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found.' });
+    }
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Current password is incorrect.' });
+    }
+    user.password = newPassword;
+    await user.save();
+    res.json({ message: 'Password updated successfully.' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get notification preferences (must be before GET /me)
+router.get('/me/notifications', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id)
+      .select('notificationPreferences')
+      .lean();
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    const prefs = user.notificationPreferences || {};
+    res.json({
+      friendsWorkoutsCompleted: prefs.friendsWorkoutsCompleted ?? true,
+      myWorkoutsCompleted: prefs.myWorkoutsCompleted ?? true,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Update notification preferences
+router.put('/me/notifications', auth, async (req, res) => {
+  try {
+    const { friendsWorkoutsCompleted, myWorkoutsCompleted } = req.body;
+    const update = {};
+    if (typeof friendsWorkoutsCompleted === 'boolean') {
+      update['notificationPreferences.friendsWorkoutsCompleted'] = friendsWorkoutsCompleted;
+    }
+    if (typeof myWorkoutsCompleted === 'boolean') {
+      update['notificationPreferences.myWorkoutsCompleted'] = myWorkoutsCompleted;
+    }
+    if (Object.keys(update).length === 0) {
+      return res.status(400).json({ message: 'No valid notification preferences to update' });
+    }
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { $set: update },
+      { new: true, runValidators: true }
+    ).select('notificationPreferences');
+    const prefs = user?.notificationPreferences || {};
+    res.json({
+      friendsWorkoutsCompleted: prefs.friendsWorkoutsCompleted ?? true,
+      myWorkoutsCompleted: prefs.myWorkoutsCompleted ?? true,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // Get current user
 router.get('/me', auth, async (req, res) => {
   try {

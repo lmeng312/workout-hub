@@ -125,6 +125,10 @@ const workoutSchema = new mongoose.Schema({
     completedAt: {
       type: Date,
       default: Date.now
+    },
+    durationSeconds: {
+      type: Number,
+      default: 0
     }
   }],
   savedBy: [{

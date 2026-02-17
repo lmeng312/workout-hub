@@ -71,6 +71,8 @@ export default function WorkoutSessionScreen() {
   const handleCompleteExercise = (index) => {
     if (completedExercises.includes(index)) {
       setCompletedExercises(completedExercises.filter(i => i !== index));
+      // When deselecting, show the deselected exercise as current in the main view and list
+      setCurrentExerciseIndex(index);
     } else {
       setCompletedExercises([...completedExercises, index]);
       
@@ -97,7 +99,7 @@ export default function WorkoutSessionScreen() {
           text: 'Finish',
           onPress: async () => {
             try {
-              await api.post(`/workouts/${workout._id}/complete`);
+              await api.post(`/workouts/${workout._id}/complete`, { durationSeconds: elapsedTime });
               Alert.alert('Great job!', `Workout completed in ${formatTime(elapsedTime)}`, [
                 { text: 'OK', onPress: () => navigation.navigate('Main', { screen: 'Discover' }) }
               ]);

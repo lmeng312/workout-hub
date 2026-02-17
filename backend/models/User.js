@@ -50,6 +50,10 @@ const userSchema = new mongoose.Schema({
     token: { type: String, required: true },
     createdAt: { type: Date, default: Date.now, expires: '90d' }
   }],
+  notificationPreferences: {
+    friendsWorkoutsCompleted: { type: Boolean, default: true },
+    myWorkoutsCompleted: { type: Boolean, default: true },
+  },
   emailVerified: {
     type: Boolean,
     default: false
